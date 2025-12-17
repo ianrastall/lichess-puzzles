@@ -1,0 +1,218 @@
+﻿<Window x:Class="Lichess_Puzzles.MainWindow"
+xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+xmlns:local="clr-namespace:Lichess_Puzzles"
+mc:Ignorable="d"
+Title="Lichess Puzzles" Height="650" Width="950"
+Icon="pack://application:,,,/AppIcon.ico"
+Background="{DynamicResource BackgroundBrush}">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Chess Board Section -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- File Labels (top) -->
+            <UniformGrid x:Name="FileLabelsTop" Grid.Row="0" Rows="1" Columns="8" Margin="25,0,0,2">
+                <TextBlock Text="a" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="b" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="c" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="d" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="e" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="f" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="g" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="h" HorizontalAlignment="Center" FontSize="12"/>
+            </UniformGrid>
+
+            <!-- Board with Rank Labels -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Rank Labels -->
+                <UniformGrid x:Name="RankLabels" Grid.Column="0" Rows="8" Columns="1" Margin="0,0,5,0">
+                    <TextBlock Text="8" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="7" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="6" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="5" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="4" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="3" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="2" VerticalAlignment="Center" FontSize="12"/>
+                    <TextBlock Text="1" VerticalAlignment="Center" FontSize="12"/>
+                </UniformGrid>
+
+                <!-- Chess Board -->
+                <Border Grid.Column="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="2">
+                    <Grid>
+                        <UniformGrid x:Name="ChessBoardGrid" Rows="8" Columns="8" Width="480" Height="480"/>
+                        <Canvas x:Name="DragCanvas"
+                                Width="{Binding ActualWidth, ElementName=ChessBoardGrid}"
+                                Height="{Binding ActualHeight, ElementName=ChessBoardGrid}"
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Player to move indicator -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="25,10,0,0">
+                <Border x:Name="PlayerIndicator" Width="20" Height="20" CornerRadius="10" 
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,8,0"/>
+                <TextBlock x:Name="PlayerToMoveText" Text="White to move" VerticalAlignment="Center" FontSize="14"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Puzzle Info Section -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Puzzle Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                <TextBlock Text="Puzzle" FontSize="24" FontWeight="Bold"/>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                    <TextBlock Text="Rating: " Foreground="{DynamicResource SecondaryTextBrush}"/>
+                    <TextBlock x:Name="PuzzleRatingText" Text="—" FontWeight="SemiBold"/>
+                    <TextBlock Text="  •  " Foreground="{DynamicResource SecondaryTextBrush}"/>
+                    <TextBlock x:Name="PuzzleIdText" Text="" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Status Message -->
+            <Border Grid.Row="1" x:Name="StatusBorder" Background="{DynamicResource SurfaceBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" 
+                    Padding="12,8" Margin="0,0,0,15">
+                <TextBlock x:Name="StatusText" Text="Find the best move!" FontSize="14" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Themes -->
+            <StackPanel Grid.Row="2" Margin="0,0,0,15">
+                <TextBlock Text="Themes" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <ItemsControl x:Name="ThemesControl">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="4" Padding="8,4" Margin="0,0,5,5">
+                                <TextBlock Text="{Binding}" FontSize="12"/>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Move List -->
+            <Grid Grid.Row="3">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <DockPanel Grid.Row="0" Margin="0,0,0,5">
+                    <TextBlock Text="Moves" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnCopyPgn" Content="📋 Copy PGN" Click="BtnCopyPgn_Click" 
+                            HorizontalAlignment="Right" Padding="8,2" FontSize="11"/>
+                </DockPanel>
+                <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" 
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4"
+                        Padding="8">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" x:Name="MoveListScrollViewer">
+                        <ItemsControl x:Name="MoveListControl">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <!-- Move number (only for white moves or first black move) -->
+                                        <TextBlock Text="{Binding MoveNumberDisplay}" 
+                                                   FontFamily="Consolas"
+                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                   FontWeight="Bold" Margin="0,0,3,0"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding ShowMoveNumber, Converter={StaticResource BoolToVisibility}}"/>
+                                        <!-- Move button -->
+                                        <Button Content="{Binding San}" 
+                                                Tag="{Binding Index}"
+                                                Click="MoveButton_Click"
+                                                FontFamily="Consolas"
+                                                Margin="0,2,6,2"
+                                                Padding="4,2"
+                                                MinWidth="0"
+                                                Background="{Binding Background}"
+                                                BorderThickness="0"
+                                                Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" 
+                                                                        CornerRadius="3" 
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- Controls -->
+            <StackPanel Grid.Row="4" Margin="0,15,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="BtnHint" Content="💡 Hint" Click="BtnHint_Click" Margin="0,0,10,0" Width="80"/>
+                    <Button x:Name="BtnRetry" Content="🔄 Retry" Click="BtnRetry_Click" Margin="0,0,10,0" Width="80"/>
+                    <Button x:Name="BtnNext" Content="Next ➜" Click="BtnNext_Click" Width="80"/>
+                </StackPanel>
+                
+                <!-- Rating Filter -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+                    <TextBlock Text="Rating:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBox x:Name="MinRatingBox" Width="60" Text="800" VerticalAlignment="Center"/>
+                    <TextBlock Text=" — " VerticalAlignment="Center"/>
+                    <TextBox x:Name="MaxRatingBox" Width="60" Text="1500" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <!-- Database refresh -->
+                <Button x:Name="BtnRefreshDb" Content="⬇️ Update Puzzle Database" Click="BtnRefreshDb_Click" 
+                        HorizontalAlignment="Center" Margin="0,15,0,0" Padding="12,6" FontSize="11"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

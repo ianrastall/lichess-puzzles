@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+<PropertyGroup>
+  <OutputType>WinExe</OutputType>
+  <TargetFramework>net8.0-windows</TargetFramework>
+  <RootNamespace>Lichess_Puzzles</RootNamespace>
+  <Nullable>enable</Nullable>
+  <ImplicitUsings>enable</ImplicitUsings>
+  <UseWPF>true</UseWPF>
+  <Platforms>AnyCPU;x64</Platforms>
+  <LangVersion>12.0</LangVersion>
+  <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+</PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ChessDotNet" Version="1.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
+    <PackageReference Include="WPF-UI" Version="4.1.0" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Fonts\*.ttf" />
+    <Resource Include="Assets\Pieces\*.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="AppIcon.ico" />
+  </ItemGroup>
+
+</Project>

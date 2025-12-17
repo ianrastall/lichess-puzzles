@@ -10,6 +10,7 @@
   <Platforms>AnyCPU;x64</Platforms>
   <LangVersion>12.0</LangVersion>
   <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+  <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
 </PropertyGroup>
 
   <ItemGroup>

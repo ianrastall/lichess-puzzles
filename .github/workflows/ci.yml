@@ -18,8 +18,8 @@ jobs:
           dotnet-version: 8.0.x
           cache: true
 
-      - name: Restore
-        run: dotnet restore "Lichess Puzzles.sln"
+      - name: Restore (with RID)
+        run: dotnet restore "Lichess Puzzles.sln" --runtime win-x64
 
       - name: Build (Release, x64)
         run: dotnet build "Lichess Puzzles.sln" -c Release -p:Platform=x64 --no-restore

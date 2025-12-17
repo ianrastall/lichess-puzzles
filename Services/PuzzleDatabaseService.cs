@@ -102,7 +102,7 @@ public class PuzzleDatabaseService : IDisposable
             
             // Step 1: Download the ZST file COMPLETELY
             Log($"Starting download from {PuzzleDbUrl}");
-            StatusChanged?.Invoke("Downloading puzzle database (~100 MB)...");
+            StatusChanged?.Invoke("Downloading puzzle database (~250 MB)...");
             await DownloadFileCompletelyAsync(PuzzleDbUrl, tempZstPath, token);
             
             if (token.IsCancellationRequested) 

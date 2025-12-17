@@ -26,7 +26,7 @@ public partial class DatabaseSetupWindow : Window
         
         if (isRefresh)
         {
-            DescriptionText.Text = "You can refresh the puzzle database to get the latest puzzles from Lichess. This will download approximately 100 MB and rebuild the local database.";
+            DescriptionText.Text = "You can refresh the puzzle database to get the latest puzzles from Lichess. This will download approximately 250 MB and rebuild the local database.";
             BtnDownload.Content = "Refresh Database";
         }
         

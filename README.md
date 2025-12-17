@@ -3,7 +3,7 @@
 Windows desktop app (WPF/.NET 8) for practicing Lichess puzzles locally.
 
 ## Features
-- Downloads the official Lichess puzzle dump (~100 MB .zst) and builds a local SQLite database of ~5.6M puzzles.
+- Downloads the official Lichess puzzle dump (~250 MB .zst) and builds a local SQLite database of ~5.6M puzzles.
 - Play puzzles on a drag-and-drop board that flips to the side to move; click any move in the list to jump to that position.
 - Filter by rating range, get a hint, retry the current puzzle, or load the next one with a single click.
 - Shows puzzle themes and status; copy a PGN of the puzzle (includes source game metadata when available).
@@ -16,7 +16,7 @@ Windows desktop app (WPF/.NET 8) for practicing Lichess puzzles locally.
 
 ## Run the app
 1) Restore/build/run: `dotnet run --project "Lichess Puzzles.csproj"` (or open the solution in Visual Studio 2022 and press F5).
-2) On first launch, the app prompts to download the puzzle database (~100 MB). It is unpacked to SQLite at `%LOCALAPPDATA%\LichessPuzzles\chess_puzzles.db`.
+2) On first launch, the app prompts to download the puzzle database (~250 MB). It is unpacked to SQLite at `%LOCALAPPDATA%\LichessPuzzles\chess_puzzles.db`.
 3) After the download completes, a puzzle loads automatically. Use the rating boxes if you want to narrow the range before clicking `Next`.
 
 ## Using it

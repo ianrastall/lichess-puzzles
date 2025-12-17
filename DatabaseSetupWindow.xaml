@@ -26,7 +26,7 @@ Background="{DynamicResource BackgroundBrush}">
         <!-- Description -->
         <TextBlock Grid.Row="1" x:Name="DescriptionText" TextWrapping="Wrap" Margin="0,0,0,15"
                    Foreground="{DynamicResource SecondaryTextBrush}">
-            The puzzle database needs to be downloaded from Lichess. This is a one-time download of approximately 100 MB that will be decompressed into a local database containing ~5.6 million puzzles.
+            The puzzle database needs to be downloaded from Lichess. This is a one-time download of approximately 250 MB that will be decompressed into a local database containing ~5.6 million puzzles.
         </TextBlock>
         
         <!-- Status area -->

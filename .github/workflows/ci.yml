@@ -33,6 +33,8 @@ jobs:
           -p:PublishSingleFile=true
           -p:PublishTrimmed=false
           -p:SelfContained=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:IncludeAllContentForSelfExtract=true
           --no-restore
           -o artifacts/win-x64
 

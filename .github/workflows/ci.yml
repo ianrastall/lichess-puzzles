@@ -24,8 +24,8 @@ jobs:
       - name: Build (Release, x64)
         run: dotnet build "Lichess Puzzles.sln" -c Release -p:Platform=x64 --no-restore
 
-      - name: Publish (Release, win-x64)
-        run: dotnet publish "Lichess Puzzles.csproj" -c Release -r win-x64 -p:Platform=x64 --self-contained false --no-restore -o artifacts/win-x64
+      - name: Publish (Release, win-x64 self-contained)
+        run: dotnet publish "Lichess Puzzles.csproj" -c Release -r win-x64 -p:Platform=x64 --self-contained true --no-restore -o artifacts/win-x64
 
       - name: Upload artifact (win-x64)
         if: ${{ github.event_name != 'pull_request' }}

@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
+using System.ComponentModel;
 using ChessDotNet;
 using ChessDotNet.Pieces;
 using Lichess_Puzzles.Models;
@@ -33,6 +34,9 @@ namespace Lichess_Puzzles
         private bool _ratingRecorded;
         private AppSettings _settings = null!;
         private bool _useFigurineNotation;
+        private readonly ObservableCollection<SelectableTheme> _puzzleThemes = [];
+        private readonly ObservableCollection<ThemeFilterItem> _activeThemeFilters = [];
+        private bool _skipMateThemes;
 
         // Puzzle state
         private Puzzle? _currentPuzzle;
@@ -73,6 +77,11 @@ namespace Lichess_Puzzles
             _puzzleService = new PuzzleService();
             _lichessGameService = new LichessGameService();
             MoveListControl.ItemsSource = _moveList;
+            ThemesControl.ItemsSource = _puzzleThemes;
+            ActiveThemeFiltersControl.ItemsSource = _activeThemeFilters;
+            _activeThemeFilters.CollectionChanged += (_, _) => UpdateActiveFiltersPlaceholder();
+            UpdateActiveFiltersPlaceholder();
+            _skipMateThemes = SkipMateThemesCheckbox.IsChecked == true;
             LoadProfiles();
             LoadPieceImages();
             InitializeBoard();
@@ -307,13 +316,16 @@ namespace Lichess_Puzzles
                 MaxRatingBox.Text = maxRating.ToString();
             }
 
-            _currentPuzzle = _puzzleService.GetRandomPuzzle(minRating, maxRating);
+            var requiredThemes = _activeThemeFilters.Select(f => f.ThemeId).ToList();
+            var puzzle = _puzzleService.GetRandomPuzzle(minRating, maxRating, requiredThemes, _skipMateThemes);
 
-            if (_currentPuzzle == null)
+            if (puzzle == null)
             {
-                SetStatus("No puzzles found in the selected rating range.", false);
+                SetStatus("No puzzles found for the selected rating and theme filters.", false);
                 return;
             }
+
+            _currentPuzzle = puzzle;
 
             // Initialize game from FEN
             _initialFen = _currentPuzzle.Fen;
@@ -386,7 +398,87 @@ namespace Lichess_Puzzles
 
             PuzzleRatingText.Text = _currentPuzzle.Rating.ToString();
             PuzzleIdText.Text = _currentPuzzle.PuzzleId;
-            ThemesControl.ItemsSource = _currentPuzzle.Themes;
+            _puzzleThemes.Clear();
+            var activeThemeIds = _activeThemeFilters
+                .Select(f => f.ThemeId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var theme in _currentPuzzle.Themes)
+            {
+                _puzzleThemes.Add(new SelectableTheme(theme.ThemeId, theme.DisplayName)
+                {
+                    IsSelected = activeThemeIds.Contains(theme.ThemeId)
+                });
+            }
+        }
+
+        private void ThemeTag_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: SelectableTheme theme }) return;
+
+            bool alreadySelected = _activeThemeFilters.Any(f => 
+                f.ThemeId.Equals(theme.ThemeId, StringComparison.OrdinalIgnoreCase));
+
+            if (alreadySelected)
+            {
+                RemoveThemeFilter(theme.ThemeId);
+            }
+            else
+            {
+                AddThemeFilter(theme);
+            }
+        }
+
+        private void RemoveThemeFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: string themeId })
+            {
+                RemoveThemeFilter(themeId);
+            }
+        }
+
+        private void AddThemeFilter(SelectableTheme theme)
+        {
+            if (_activeThemeFilters.Any(f => 
+                    f.ThemeId.Equals(theme.ThemeId, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            _activeThemeFilters.Add(new ThemeFilterItem(theme.ThemeId, theme.DisplayName));
+            theme.IsSelected = true;
+            UpdateActiveFiltersPlaceholder();
+        }
+
+        private void RemoveThemeFilter(string themeId)
+        {
+            var existing = _activeThemeFilters.FirstOrDefault(f =>
+                f.ThemeId.Equals(themeId, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                _activeThemeFilters.Remove(existing);
+            }
+
+            foreach (var theme in _puzzleThemes.Where(t =>
+                         t.ThemeId.Equals(themeId, StringComparison.OrdinalIgnoreCase)))
+            {
+                theme.IsSelected = false;
+            }
+
+            UpdateActiveFiltersPlaceholder();
+        }
+
+        private void UpdateActiveFiltersPlaceholder()
+        {
+            if (ActiveFiltersPlaceholder == null) return;
+            ActiveFiltersPlaceholder.Visibility = _activeThemeFilters.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void SkipMateThemesCheckbox_Changed(object sender, RoutedEventArgs e)
+        {
+            _skipMateThemes = SkipMateThemesCheckbox.IsChecked == true;
         }
 
         private void UpdatePlayerIndicator()
@@ -1619,4 +1711,32 @@ namespace Lichess_Puzzles
     }
 
     public record GameState(string Fen, Move? Move, string? San, int Index);
+
+    public class SelectableTheme : INotifyPropertyChanged
+    {
+        public SelectableTheme(string themeId, string displayName)
+        {
+            ThemeId = themeId;
+            DisplayName = displayName;
+        }
+
+        public string ThemeId { get; }
+        public string DisplayName { get; }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+
+    public record ThemeFilterItem(string ThemeId, string DisplayName);
 }

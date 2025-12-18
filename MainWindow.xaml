@@ -111,6 +111,8 @@ Background="{DynamicResource BackgroundBrush}">
             <!-- Themes -->
             <StackPanel Grid.Row="2" Margin="0,0,0,15">
                 <TextBlock Text="Themes" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <TextBlock Text="Click a theme to add or remove it from the active filters for upcoming puzzles." 
+                           FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,0,6"/>
                 <ItemsControl x:Name="ThemesControl">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -119,12 +121,74 @@ Background="{DynamicResource BackgroundBrush}">
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="4" Padding="8,4" Margin="0,0,5,5">
-                                <TextBlock Text="{Binding}" FontSize="12"/>
+                            <Button Tag="{Binding}" Click="ThemeTag_Click" Cursor="Hand"
+                                    Background="{DynamicResource PrimaryBrush}"
+                                    BorderThickness="0"
+                                    Padding="10,4"
+                                    Margin="0,0,5,5"
+                                    Foreground="{DynamicResource TextBrush}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                CornerRadius="4" 
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock Text="{Binding DisplayName}" FontSize="12"/>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Active filters" FontSize="13" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                <ItemsControl x:Name="ActiveThemeFiltersControl">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,5,5">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="12" Margin="0,0,6,0"/>
+                                    <Button Content="x" Tag="{Binding ThemeId}" 
+                                            Click="RemoveThemeFilter_Click"
+                                            Padding="4,0"
+                                            MinWidth="20"
+                                            Height="20"
+                                            Background="{DynamicResource PrimaryBrush}"
+                                            BorderThickness="0"/>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <TextBlock x:Name="ActiveFiltersPlaceholder" Text="No filters applied"
+                           Foreground="{DynamicResource SecondaryTextBrush}" FontSize="11" Margin="0,2,0,0"/>
+
+                <CheckBox x:Name="SkipMateThemesCheckbox" Content="Skip mate puzzles"
+                          Margin="0,10,0,0"
+                          Checked="SkipMateThemesCheckbox_Changed"
+                          Unchecked="SkipMateThemesCheckbox_Changed"/>
             </StackPanel>
 
             <!-- Move List -->

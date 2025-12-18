@@ -11,7 +11,7 @@ public record Puzzle
     public required int NbPlays { get; init; }
     public string? GameUrl { get; init; }
     public string? OpeningTags { get; init; }
-    public List<string> Themes { get; init; } = [];
+    public List<Theme> Themes { get; init; } = [];
 
     /// <summary>
     /// Gets the moves as a list of UCI move strings (e.g., "e2e4").

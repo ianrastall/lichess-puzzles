@@ -28,27 +28,71 @@ public class PuzzleService : IDisposable
         return connection;
     }
 
-    public Puzzle? GetRandomPuzzle(int? minRating = null, int? maxRating = null)
+    public Puzzle? GetRandomPuzzle(
+        int? minRating = null, 
+        int? maxRating = null, 
+        IReadOnlyCollection<string>? requiredThemeIds = null,
+        bool excludeMateThemes = false)
     {
         using var connection = CreateConnection();
         using var cmd = connection.CreateCommand();
+
+        var requiredThemes = requiredThemeIds?
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         
         var whereClauses = new List<string>();
         if (minRating.HasValue)
         {
-            whereClauses.Add("Rating >= @minRating");
+            whereClauses.Add("p.Rating >= @minRating");
             cmd.Parameters.AddWithValue("@minRating", minRating.Value);
         }
         if (maxRating.HasValue)
         {
-            whereClauses.Add("Rating <= @maxRating");
+            whereClauses.Add("p.Rating <= @maxRating");
             cmd.Parameters.AddWithValue("@maxRating", maxRating.Value);
+        }
+
+        if (requiredThemes is { Count: > 0 })
+        {
+            var paramNames = requiredThemes
+                .Select((_, i) => $"@theme{i}")
+                .ToList();
+
+            whereClauses.Add($@"
+                p.PuzzleId IN (
+                    SELECT PuzzleId 
+                    FROM PuzzleThemes 
+                    WHERE ThemeId IN ({string.Join(", ", paramNames)})
+                    GROUP BY PuzzleId
+                    HAVING COUNT(DISTINCT ThemeId) = {requiredThemes.Count}
+                )");
+
+            for (int i = 0; i < requiredThemes.Count; i++)
+            {
+                cmd.Parameters.AddWithValue(paramNames[i], requiredThemes[i]);
+            }
+        }
+
+        if (excludeMateThemes)
+        {
+            whereClauses.Add("""
+                p.PuzzleId NOT IN (
+                    SELECT PuzzleId 
+                    FROM PuzzleThemes 
+                    WHERE ThemeId = 'mate'
+                       OR LOWER(ThemeId) LIKE 'matein%'
+                       OR ThemeId LIKE '%Mate'
+                )
+                """);
         }
 
         var whereClause = whereClauses.Count > 0 ? $"WHERE {string.Join(" AND ", whereClauses)}" : string.Empty;
         cmd.CommandText = $@"
-            SELECT PuzzleId, Fen, Moves, Rating, RatingDeviation, Popularity, NbPlays, GameUrl, OpeningTags
-            FROM Puzzles
+            SELECT p.PuzzleId, p.Fen, p.Moves, p.Rating, p.RatingDeviation, p.Popularity, p.NbPlays, p.GameUrl, p.OpeningTags
+            FROM Puzzles p
             {whereClause}
             ORDER BY RANDOM()
             LIMIT 1";
@@ -94,42 +138,8 @@ public class PuzzleService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(themeId))
             throw new ArgumentException("Theme ID cannot be empty", nameof(themeId));
-            
-        using var connection = CreateConnection();
-        using var cmd = connection.CreateCommand();
 
-        var conditions = new List<string> { "pt.ThemeId = @themeId" };
-        cmd.Parameters.AddWithValue("@themeId", themeId);
-        
-        if (minRating.HasValue)
-        {
-            conditions.Add("p.Rating >= @minRating");
-            cmd.Parameters.AddWithValue("@minRating", minRating.Value);
-        }
-        if (maxRating.HasValue)
-        {
-            conditions.Add("p.Rating <= @maxRating");
-            cmd.Parameters.AddWithValue("@maxRating", maxRating.Value);
-        }
-
-        cmd.CommandText = $@"
-            SELECT p.PuzzleId, p.Fen, p.Moves, p.Rating, p.RatingDeviation, p.Popularity, p.NbPlays, p.GameUrl, p.OpeningTags
-            FROM Puzzles p
-            INNER JOIN PuzzleThemes pt ON p.PuzzleId = pt.PuzzleId
-            WHERE {string.Join(" AND ", conditions)}
-            ORDER BY RANDOM() 
-            LIMIT 1";
-
-        using var reader = cmd.ExecuteReader();
-        if (reader.Read())
-        {
-            var puzzle = ReadPuzzle(reader);
-            reader.Close();
-            puzzle = puzzle with { Themes = GetPuzzleThemes(connection, puzzle.PuzzleId) };
-            return puzzle;
-        }
-
-        return null;
+        return GetRandomPuzzle(minRating, maxRating, new[] { themeId });
     }
 
     public List<Theme> GetAllThemes()
@@ -153,21 +163,27 @@ public class PuzzleService : IDisposable
         return themes;
     }
 
-    private static List<string> GetPuzzleThemes(SqliteConnection connection, string puzzleId)
+    private static List<Theme> GetPuzzleThemes(SqliteConnection connection, string puzzleId)
     {
-        var themes = new List<string>();
+        var themes = new List<Theme>();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT t.DisplayName 
+            SELECT t.ThemeId, t.DisplayName, t.Description
             FROM PuzzleThemes pt 
             INNER JOIN Themes t ON pt.ThemeId = t.ThemeId 
-            WHERE pt.PuzzleId = @puzzleId";
+            WHERE pt.PuzzleId = @puzzleId
+            ORDER BY t.DisplayName";
         cmd.Parameters.AddWithValue("@puzzleId", puzzleId);
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            themes.Add(reader.GetString(0));
+            themes.Add(new Theme
+            {
+                ThemeId = reader.GetString(0),
+                DisplayName = reader.GetString(1),
+                Description = reader.IsDBNull(2) ? null : reader.GetString(2)
+            });
         }
 
         return themes;

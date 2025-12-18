@@ -27,6 +27,8 @@ namespace Lichess_Puzzles
         private readonly Dictionary<string, DrawingImage> _pieceImages = [];
         private PuzzleService _puzzleService;
         private readonly LichessGameService _lichessGameService;
+        private AppSettings _settings = null!;
+        private bool _useFigurineNotation;
 
         // Puzzle state
         private Puzzle? _currentPuzzle;
@@ -48,18 +50,21 @@ namespace Lichess_Puzzles
         private bool _isDragging;
         private UIElement? _dragVisualElement;
 
-        private static readonly SolidColorBrush LightSquareBrush = new(Color.FromRgb(240, 217, 181));
-        private static readonly SolidColorBrush DarkSquareBrush = new(Color.FromRgb(181, 136, 99));
-        private static readonly SolidColorBrush SelectedBrush = new(Color.FromRgb(130, 151, 105));
-        private static readonly SolidColorBrush ValidMoveBrush = new(Color.FromRgb(130, 151, 105));
-        private static readonly SolidColorBrush CorrectMoveBrush = new(Color.FromRgb(100, 180, 100));
-        private static readonly SolidColorBrush CurrentMoveBrush = new(Color.FromRgb(82, 130, 180));
-        private static readonly SolidColorBrush PuzzleMoveBrush = new(Color.FromRgb(160, 130, 200)); // Light purple for puzzle moves
-        private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
+        private SolidColorBrush _lightSquareBrush = CreateFrozenBrush(Color.FromRgb(240, 217, 181));
+        private SolidColorBrush _darkSquareBrush = CreateFrozenBrush(Color.FromRgb(181, 136, 99));
+        private SolidColorBrush _selectedBrush = CreateFrozenBrush(Color.FromRgb(130, 151, 105));
+        private SolidColorBrush _validMoveBrush = CreateFrozenBrush(Color.FromRgb(130, 151, 105));
+        private static readonly SolidColorBrush CorrectMoveBrush = CreateFrozenBrush(Color.FromRgb(100, 180, 100));
+        private static readonly SolidColorBrush CurrentMoveBrush = CreateFrozenBrush(Color.FromRgb(82, 130, 180));
+        private static readonly SolidColorBrush PuzzleMoveBrush = CreateFrozenBrush(Color.FromRgb(160, 130, 200)); // Light purple for puzzle moves
+        private static readonly SolidColorBrush TransparentBrush = CreateFrozenBrush(Colors.Transparent);
 
         public MainWindow()
         {
             InitializeComponent();
+            _settings = AppSettingsService.Load();
+            _useFigurineNotation = _settings.SanDisplay == SanDisplayOption.Symbols;
+            ApplyBoardTheme(_settings.BoardTheme, refreshBoard: false);
             _puzzleService = new PuzzleService();
             _lichessGameService = new LichessGameService();
             MoveListControl.ItemsSource = _moveList;
@@ -109,6 +114,58 @@ namespace Lichess_Puzzles
             }
         }
 
+        private void ApplyBoardTheme(BoardThemeOption theme, bool refreshBoard = true)
+        {
+            var palette = GetBoardThemePalette(theme);
+            _lightSquareBrush = CreateFrozenBrush(palette.LightSquare);
+            _darkSquareBrush = CreateFrozenBrush(palette.DarkSquare);
+            _selectedBrush = CreateFrozenBrush(palette.Selection);
+            _validMoveBrush = _selectedBrush;
+
+            if (refreshBoard && _currentPuzzle != null)
+            {
+                UpdateBoard();
+                UpdateMoveListHighlight();
+            }
+        }
+
+        private static SolidColorBrush CreateFrozenBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            if (brush.CanFreeze)
+            {
+                brush.Freeze();
+            }
+            return brush;
+        }
+
+        private static BoardThemePalette GetBoardThemePalette(BoardThemeOption option)
+        {
+            return option switch
+            {
+                BoardThemeOption.Blue => new BoardThemePalette(
+                    LightSquare: Color.FromRgb(214, 230, 247),
+                    DarkSquare: Color.FromRgb(93, 131, 167),
+                    Selection: Color.FromRgb(116, 168, 209)),
+                BoardThemeOption.Green => new BoardThemePalette(
+                    LightSquare: Color.FromRgb(223, 237, 223),
+                    DarkSquare: Color.FromRgb(104, 142, 104),
+                    Selection: Color.FromRgb(124, 170, 124)),
+                BoardThemeOption.Purple => new BoardThemePalette(
+                    LightSquare: Color.FromRgb(236, 228, 244),
+                    DarkSquare: Color.FromRgb(121, 99, 149),
+                    Selection: Color.FromRgb(164, 136, 190)),
+                BoardThemeOption.Red => new BoardThemePalette(
+                    LightSquare: Color.FromRgb(244, 226, 226),
+                    DarkSquare: Color.FromRgb(170, 112, 112),
+                    Selection: Color.FromRgb(200, 140, 140)),
+                _ => new BoardThemePalette(
+                    LightSquare: Color.FromRgb(240, 217, 181),
+                    DarkSquare: Color.FromRgb(181, 136, 99),
+                    Selection: Color.FromRgb(130, 151, 105))
+            };
+        }
+
         private void InitializeBoard()
         {
             for (int row = 0; row < 8; row++)
@@ -117,7 +174,7 @@ namespace Lichess_Puzzles
                 {
                     var border = new Border
                     {
-                        Background = (row + col) % 2 == 0 ? LightSquareBrush : DarkSquareBrush
+                        Background = (row + col) % 2 == 0 ? _lightSquareBrush : _darkSquareBrush
                     };
 
                     border.MouseLeftButtonDown += Square_Click;
@@ -293,7 +350,7 @@ namespace Lichess_Puzzles
                     // Reset square color
                     int visualRow = _boardFlipped ? row : 7 - row;
                     int visualCol = _boardFlipped ? 7 - col : col;
-                    border.Background = (visualRow + visualCol) % 2 == 0 ? LightSquareBrush : DarkSquareBrush;
+                    border.Background = (visualRow + visualCol) % 2 == 0 ? _lightSquareBrush : _darkSquareBrush;
 
                     var currentPieceKey = piece != null ? GetPieceKey(piece) : null;
                     var existingChild = border.Child;
@@ -668,7 +725,7 @@ namespace Lichess_Puzzles
             }
         }
 
-        private string GetSanNotation(ChessGame game, Move move)
+        internal static string GetSanNotation(ChessGame game, Move move)
         {
             var piece = game.GetPieceAt(move.OriginalPosition);
             if (piece == null) return "";
@@ -755,6 +812,12 @@ namespace Lichess_Puzzles
                 _ => ' '
             };
         }
+
+        private string FormatSanForDisplay(string san)
+        {
+            if (string.IsNullOrEmpty(san)) return san;
+            return _useFigurineNotation ? ConvertToFigurine(san) : san;
+        }
         
         private static string ConvertToFigurine(string san)
         {
@@ -773,7 +836,16 @@ namespace Lichess_Puzzles
             };
         }
 
-        private static Position ParsePosition(string pos)
+        private void ApplySanDisplayPreference()
+        {
+            for (int i = 0; i < _moveList.Count; i++)
+            {
+                var entry = _moveList[i];
+                _moveList[i] = entry with { San = FormatSanForDisplay(entry.RawSan) };
+            }
+        }
+
+        internal static Position ParsePosition(string pos)
         {
             var file = (File)(pos[0] - 'a');
             var rank = pos[1] - '0';
@@ -797,7 +869,7 @@ namespace Lichess_Puzzles
         {
             var border = GetSquareAt(position);
             if (border != null)
-                border.Background = SelectedBrush;
+                border.Background = _selectedBrush;
         }
 
         private void HighlightValidMoves(Position from)
@@ -814,14 +886,14 @@ namespace Lichess_Puzzles
                     {
                         Width = 15,
                         Height = 15,
-                        Fill = ValidMoveBrush,
+                        Fill = _validMoveBrush,
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center
                     };
                 }
                 else
                 {
-                    square.Background = ValidMoveBrush;
+                    square.Background = _validMoveBrush;
                 }
             }
         }
@@ -888,7 +960,8 @@ namespace Lichess_Puzzles
             var entry = new MoveDisplayEntry
             {
                 Index = _gameHistory.Count - 1,
-                San = ConvertToFigurine(currentSan),
+                RawSan = currentSan,
+                San = FormatSanForDisplay(currentSan),
                 MoveNumber = moveNumber,
                 IsWhiteMove = isWhiteMove,
                 ShowMoveNumber = showMoveNumber,
@@ -1013,7 +1086,8 @@ namespace Lichess_Puzzles
                     var entry = new MoveDisplayEntry
                     {
                         Index = _gameHistory.Count - 1,
-                        San = ConvertToFigurine(displaySan),
+                        RawSan = displaySan,
+                        San = FormatSanForDisplay(displaySan),
                         MoveNumber = moveNumber,
                         IsWhiteMove = isWhiteMove,
                         ShowMoveNumber = showMoveNumber,
@@ -1302,6 +1376,22 @@ namespace Lichess_Puzzles
             }
         }
         
+        private void BtnOptions_Click(object sender, RoutedEventArgs e)
+        {
+            var optionsWindow = new OptionsWindow(_settings);
+            optionsWindow.Owner = this;
+            var result = optionsWindow.ShowDialog();
+            
+            if (result == true)
+            {
+                _settings = optionsWindow.UpdatedSettings;
+                _useFigurineNotation = _settings.SanDisplay == SanDisplayOption.Symbols;
+                ApplyBoardTheme(_settings.BoardTheme);
+                ApplySanDisplayPreference();
+                AppSettingsService.Save(_settings);
+            }
+        }
+        
         private void BtnCopyPgn_Click(object sender, RoutedEventArgs e)
         {
             var pgn = GeneratePgn();
@@ -1402,6 +1492,8 @@ namespace Lichess_Puzzles
             return sb.ToString();
         }
 
+        private readonly record struct BoardThemePalette(Color LightSquare, Color DarkSquare, Color Selection);
+
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
@@ -1413,6 +1505,7 @@ namespace Lichess_Puzzles
     public record MoveDisplayEntry
     {
         public int Index { get; init; }
+        public string RawSan { get; init; } = "";
         public string San { get; init; } = "";
         public int MoveNumber { get; init; }
         public bool IsWhiteMove { get; init; }

@@ -22,6 +22,12 @@
           "SQLitePCLRaw.core": "2.1.11"
         }
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[8.0.22, )",
+        "resolved": "8.0.22",
+        "contentHash": "MhcMithKEiyyNkD2ZfbDZPmcOdi0GheGfg8saEIIEfD/fol3iHmcV8TsZkD4ZYz5gdUuoX4YtlVySUU7Sxl9SQ=="
+      },
       "SharpVectors.Wpf": {
         "type": "Direct",
         "requested": "[1.8.5, )",

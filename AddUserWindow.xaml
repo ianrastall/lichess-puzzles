@@ -1,0 +1,24 @@
+<Window x:Class="Lichess_Puzzles.AddUserWindow"
+xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+Title="New Profile" Height="160" Width="320"
+WindowStartupLocation="CenterOwner"
+ResizeMode="NoResize"
+Background="{DynamicResource BackgroundBrush}"
+Foreground="{DynamicResource TextBrush}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Profile name" FontWeight="SemiBold"/>
+        <TextBox x:Name="NameBox" Grid.Row="1" Margin="0,8,0,12"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Create" Width="80" Click="Create_Click" Margin="0,0,8,0"/>
+            <Button Content="Cancel" Width="80" Click="Cancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

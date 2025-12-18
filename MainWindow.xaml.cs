@@ -27,6 +27,10 @@ namespace Lichess_Puzzles
         private readonly Dictionary<string, DrawingImage> _pieceImages = [];
         private PuzzleService _puzzleService;
         private readonly LichessGameService _lichessGameService;
+        private readonly UserProfileService _userProfileService;
+        private List<UserProfile> _profiles = [];
+        private UserProfile? _currentUser;
+        private bool _ratingRecorded;
         private AppSettings _settings = null!;
         private bool _useFigurineNotation;
 
@@ -65,9 +69,11 @@ namespace Lichess_Puzzles
             _settings = AppSettingsService.Load();
             _useFigurineNotation = _settings.SanDisplay == SanDisplayOption.Symbols;
             ApplyBoardTheme(_settings.BoardTheme, refreshBoard: false);
+            _userProfileService = new UserProfileService();
             _puzzleService = new PuzzleService();
             _lichessGameService = new LichessGameService();
             MoveListControl.ItemsSource = _moveList;
+            LoadProfiles();
             LoadPieceImages();
             InitializeBoard();
             
@@ -166,6 +172,69 @@ namespace Lichess_Puzzles
             };
         }
 
+        private void LoadProfiles()
+        {
+            _profiles = _userProfileService.GetProfiles().ToList();
+
+            _currentUser = _profiles.FirstOrDefault(p => p.Id == _settings.SelectedUserId) 
+                           ?? _profiles.FirstOrDefault();
+
+            if (_currentUser == null)
+            {
+                _currentUser = _userProfileService.AddProfile("Player 1");
+                _profiles = _userProfileService.GetProfiles().ToList();
+            }
+
+            UserCombo.ItemsSource = _profiles;
+            UserCombo.DisplayMemberPath = nameof(UserProfile.Name);
+            UserCombo.SelectedValuePath = nameof(UserProfile.Id);
+
+            if (_currentUser != null)
+            {
+                UserCombo.SelectedValue = _currentUser.Id;
+                UpdateUserRatingDisplay();
+            }
+        }
+
+        private void UpdateUserRatingDisplay()
+        {
+            if (_currentUser == null)
+            {
+                UserRatingText.Text = "Rating: —";
+                return;
+            }
+
+            UserRatingText.Text = $"Rating: {_currentUser.Rating:F0} (RD {_currentUser.RatingDeviation:F0})";
+        }
+
+        private void UserCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (UserCombo.SelectedItem is UserProfile profile)
+            {
+                _currentUser = profile;
+                _settings.SelectedUserId = profile.Id;
+                AppSettingsService.Save(_settings);
+                UpdateUserRatingDisplay();
+            }
+        }
+
+        private void BtnAddUser_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new AddUserWindow { Owner = this };
+            var result = dlg.ShowDialog();
+            if (result == true)
+            {
+                var created = _userProfileService.AddProfile(dlg.UserName);
+                _profiles = _userProfileService.GetProfiles().ToList();
+                UserCombo.ItemsSource = _profiles;
+                UserCombo.SelectedValue = created.Id;
+                _currentUser = created;
+                _settings.SelectedUserId = created.Id;
+                AppSettingsService.Save(_settings);
+                UpdateUserRatingDisplay();
+            }
+        }
+
         private void InitializeBoard()
         {
             for (int row = 0; row < 8; row++)
@@ -219,6 +288,7 @@ namespace Lichess_Puzzles
 
         private void LoadNewPuzzle()
         {
+            _ratingRecorded = false;
             if (!int.TryParse(MinRatingBox.Text, out int minRating) || minRating < 0 || minRating > 3500)
             {
                 minRating = 800;
@@ -669,6 +739,7 @@ namespace Lichess_Puzzles
                     SetStatus("✓ Puzzle solved!", true);
                     ShowFullGameMoveList();
                     UpdateMoveListHighlight();
+                    RecordPuzzleResult(true);
                 }
                 else
                 {
@@ -688,6 +759,7 @@ namespace Lichess_Puzzles
                                 _puzzleSolved = true;
                                 SetStatus("✓ Puzzle solved!", true);
                                 ShowFullGameMoveList();
+                                RecordPuzzleResult(true);
                             }
                             else
                             {
@@ -703,6 +775,7 @@ namespace Lichess_Puzzles
                 // Wrong move
                 _puzzleFailed = true;
                 SetStatus($"✗ Incorrect. The best move was {FormatMove(expectedMove)}", false);
+                RecordPuzzleResult(false);
             }
         }
 
@@ -863,6 +936,35 @@ namespace Lichess_Puzzles
         private static string FormatMove(string uciMove)
         {
             return uciMove.Length >= 4 ? $"{uciMove[..2]}-{uciMove[2..4]}" : uciMove;
+        }
+
+        private void RecordPuzzleResult(bool success)
+        {
+            if (_ratingRecorded || _currentUser == null || _currentPuzzle == null) return;
+
+            double score = success ? 1.0 : 0.0;
+            double opponentRating = _currentPuzzle.Rating;
+            double opponentRd = _currentPuzzle.RatingDeviation > 0 ? _currentPuzzle.RatingDeviation : 60;
+
+            var (newRating, newRd, newVol) = Glicko2Calculator.Update(
+                _currentUser.Rating,
+                _currentUser.RatingDeviation,
+                _currentUser.Volatility,
+                opponentRating,
+                opponentRd,
+                score);
+
+            _currentUser = _currentUser with
+            {
+                Rating = newRating,
+                RatingDeviation = newRd,
+                Volatility = newVol,
+                LastUpdatedUtc = DateTime.UtcNow
+            };
+
+            _userProfileService.UpdateProfile(_currentUser);
+            _ratingRecorded = true;
+            UpdateUserRatingDisplay();
         }
 
         private void HighlightSelectedSquare(Position position)
@@ -1315,6 +1417,7 @@ namespace Lichess_Puzzles
             _displayedMoveIndex = -1;
             _puzzleSolved = false;
             _puzzleFailed = false;
+            _ratingRecorded = false;
             _moveList.Clear();
             _gameHistory.Clear();
 

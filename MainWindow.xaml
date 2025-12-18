@@ -86,6 +86,12 @@ Background="{DynamicResource BackgroundBrush}">
 
             <!-- Puzzle Header -->
             <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Profile:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="UserCombo" Width="170" SelectionChanged="UserCombo_SelectionChanged"/>
+                    <Button x:Name="BtnAddUser" Content="New" Width="60" Margin="8,0,0,0" Click="BtnAddUser_Click"/>
+                </StackPanel>
+                <TextBlock x:Name="UserRatingText" Text="Rating: —" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" Margin="0,0,0,8"/>
                 <TextBlock Text="Puzzle" FontSize="24" FontWeight="Bold"/>
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                     <TextBlock Text="Rating: " Foreground="{DynamicResource SecondaryTextBrush}"/>

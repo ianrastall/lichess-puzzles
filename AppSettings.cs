@@ -22,6 +22,7 @@ public class AppSettings
 {
     public BoardThemeOption BoardTheme { get; set; } = BoardThemeOption.Brown;
     public SanDisplayOption SanDisplay { get; set; } = SanDisplayOption.Symbols;
+    public Guid SelectedUserId { get; set; } = Guid.Empty;
 }
 
 public static class AppSettingsService

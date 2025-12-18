@@ -5,14 +5,14 @@ xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 xmlns:local="clr-namespace:Lichess_Puzzles"
 mc:Ignorable="d"
-Title="Lichess Puzzles" Height="720" Width="1300"
+Title="Lichess Puzzles" Height="720" Width="1300" WindowState="Maximized" MinWidth="1200" MinHeight="750"
 Icon="pack://application:,,,/AppIcon.ico"
 Background="{DynamicResource BackgroundBrush}">
     <Grid Margin="20">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="320"/>
+            <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="20"/>
-            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="2*"/>
             <ColumnDefinition Width="20"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
@@ -26,13 +26,12 @@ Background="{DynamicResource BackgroundBrush}">
                     <ComboBox x:Name="UserCombo" Width="170" SelectionChanged="UserCombo_SelectionChanged"/>
                     <Button x:Name="BtnAddUser" Content="New" Width="60" Margin="8,0,0,0" Click="BtnAddUser_Click"/>
                 </StackPanel>
-                <TextBlock x:Name="UserRatingText" Text="Rating: -" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" Margin="0,0,0,8"/>
-                <TextBlock Text="Puzzle" FontSize="24" FontWeight="Bold"/>
-                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                    <TextBlock Text="Rating: " Foreground="{DynamicResource SecondaryTextBrush}"/>
-                    <TextBlock x:Name="PuzzleRatingText" Text="-" FontWeight="SemiBold"/>
-                    <TextBlock Text=" | " Foreground="{DynamicResource SecondaryTextBrush}"/>
-                    <TextBlock x:Name="PuzzleIdText" Text="" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" VerticalAlignment="Center"/>
+                <TextBlock Text="Puzzle" FontSize="28" FontWeight="Bold"/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock Text="Rating: " Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14"/>
+                    <TextBlock x:Name="PuzzleRatingText" Text="-" FontWeight="SemiBold" FontSize="16"/>
+                    <TextBlock Text=" | " Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14"/>
+                    <TextBlock x:Name="PuzzleIdText" Text="" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" VerticalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>
 
@@ -40,14 +39,14 @@ Background="{DynamicResource BackgroundBrush}">
             <Border x:Name="StatusBorder" Background="{DynamicResource SurfaceBrush}" 
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" 
                     Padding="12,8" Margin="0,0,0,15">
-                <TextBlock x:Name="StatusText" Text="Find the best move!" FontSize="14" TextWrapping="Wrap"/>
+                <TextBlock x:Name="StatusText" Text="Find the best move!" FontSize="15" TextWrapping="Wrap"/>
             </Border>
 
             <!-- Themes -->
             <StackPanel Margin="0,0,0,15">
-                <TextBlock Text="Themes" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <TextBlock Text="Themes" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6"/>
                 <TextBlock Text="Click a theme to add or remove it from the active filters for upcoming puzzles." 
-                           FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,0,6"/>
+                           FontSize="13" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,0,8"/>
                 <ItemsControl x:Name="ThemesControl">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -86,13 +85,13 @@ Background="{DynamicResource BackgroundBrush}">
                                         </Style.Triggers>
                                     </Style>
                                 </Button.Style>
-                                <TextBlock Text="{Binding DisplayName}" FontSize="12"/>
-                            </Button>
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="14"/>
+                                </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <TextBlock Text="Active filters" FontSize="13" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                <TextBlock Text="Active filters" FontSize="15" FontWeight="SemiBold" Margin="4,10,0,6"/>
                 <ItemsControl x:Name="ActiveThemeFiltersControl">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -104,7 +103,7 @@ Background="{DynamicResource BackgroundBrush}">
                             <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,5,5">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding DisplayName}" FontSize="12" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="14" Margin="0,0,6,0"/>
                                     <Button Content="x" Tag="{Binding ThemeId}" 
                                             Click="RemoveThemeFilter_Click"
                                             Padding="4,0"
@@ -118,10 +117,11 @@ Background="{DynamicResource BackgroundBrush}">
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock x:Name="ActiveFiltersPlaceholder" Text="No filters applied"
-                           Foreground="{DynamicResource SecondaryTextBrush}" FontSize="11" Margin="0,2,0,0"/>
+                           Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" Margin="0,2,0,0"/>
 
                 <CheckBox x:Name="SkipMateThemesCheckbox" Content="Skip mate puzzles"
                           Margin="0,10,0,0"
+                          FontSize="14"
                           Checked="SkipMateThemesCheckbox_Changed"
                           Unchecked="SkipMateThemesCheckbox_Changed"/>
             </StackPanel>
@@ -129,24 +129,24 @@ Background="{DynamicResource BackgroundBrush}">
             <!-- Controls -->
             <StackPanel Margin="0,10,0,0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button x:Name="BtnHint" Content="Hint" Click="BtnHint_Click" Margin="0,0,10,0" Width="80"/>
-                    <Button x:Name="BtnRetry" Content="Retry" Click="BtnRetry_Click" Margin="0,0,10,0" Width="80"/>
-                    <Button x:Name="BtnNext" Content="Next >" Click="BtnNext_Click" Width="80"/>
+                    <Button x:Name="BtnHint" Content="Hint" Click="BtnHint_Click" Margin="0,0,12,0" Width="100" FontSize="14"/>
+                    <Button x:Name="BtnRetry" Content="Retry" Click="BtnRetry_Click" Margin="0,0,12,0" Width="100" FontSize="14"/>
+                    <Button x:Name="BtnNext" Content="Next >" Click="BtnNext_Click" Width="100" FontSize="14"/>
                 </StackPanel>
                 
                 <!-- Rating Filter -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
-                    <TextBlock Text="Rating:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBox x:Name="MinRatingBox" Width="60" Text="800" VerticalAlignment="Center"/>
-                    <TextBlock Text=" - " VerticalAlignment="Center"/>
-                    <TextBox x:Name="MaxRatingBox" Width="60" Text="1500" VerticalAlignment="Center"/>
+                    <TextBlock Text="Rating:" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="14"/>
+                    <TextBox x:Name="MinRatingBox" Width="80" Text="800" VerticalAlignment="Center" FontSize="14"/>
+                    <TextBlock Text=" - " VerticalAlignment="Center" FontSize="14"/>
+                    <TextBox x:Name="MaxRatingBox" Width="80" Text="1500" VerticalAlignment="Center" FontSize="14"/>
                 </StackPanel>
                 
                 <!-- Database refresh -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
                     <Button x:Name="BtnRefreshDb" Content="Update Puzzle Database" Click="BtnRefreshDb_Click" 
-                            Padding="12,6" FontSize="11" Margin="0,0,10,0"/>
-                    <Button x:Name="BtnOptions" Content="Options" Click="BtnOptions_Click" Padding="12,6" FontSize="11"/>
+                            Padding="16,8" FontSize="13" Margin="0,0,12,0"/>
+                    <Button x:Name="BtnOptions" Content="Options" Click="BtnOptions_Click" Padding="16,8" FontSize="13"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>
@@ -155,67 +155,74 @@ Background="{DynamicResource BackgroundBrush}">
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- File Labels (top) -->
             <UniformGrid x:Name="FileLabelsTop" Grid.Row="0" Rows="1" Columns="8" Margin="25,0,0,2">
-                <TextBlock Text="a" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="b" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="c" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="d" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="e" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="f" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="g" HorizontalAlignment="Center" FontSize="12"/>
-                <TextBlock Text="h" HorizontalAlignment="Center" FontSize="12"/>
+                <TextBlock Text="a" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="b" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="c" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="d" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="e" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="f" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="g" HorizontalAlignment="Center" FontSize="15"/>
+                <TextBlock Text="h" HorizontalAlignment="Center" FontSize="15"/>
             </UniformGrid>
 
             <!-- Board with Rank Labels -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Rank Labels -->
-                <UniformGrid x:Name="RankLabels" Grid.Column="0" Rows="8" Columns="1" Margin="0,0,5,0">
-                    <TextBlock Text="8" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="7" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="6" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="5" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="4" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="3" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="2" VerticalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="1" VerticalAlignment="Center" FontSize="12"/>
-                </UniformGrid>
-
-                <!-- Chess Board -->
-                <Border Grid.Column="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="2">
+            <Grid Grid.Row="1" x:Name="BoardArea">
+                <Viewbox Stretch="Uniform" StretchDirection="Both">
                     <Grid>
-                        <UniformGrid x:Name="ChessBoardGrid" Rows="8" Columns="8" Width="480" Height="480"/>
-                        <Canvas x:Name="DragCanvas"
-                                Width="{Binding ActualWidth, ElementName=ChessBoardGrid}"
-                                Height="{Binding ActualHeight, ElementName=ChessBoardGrid}"
-                                IsHitTestVisible="False"/>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Rank Labels -->
+                        <UniformGrid x:Name="RankLabels" Grid.Column="0" Rows="8" Columns="1" Margin="0,0,8,0">
+                            <TextBlock Text="8" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="7" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="6" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="5" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="4" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="3" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="2" VerticalAlignment="Center" FontSize="16"/>
+                            <TextBlock Text="1" VerticalAlignment="Center" FontSize="16"/>
+                        </UniformGrid>
+
+                        <!-- Chess Board -->
+                        <Border Grid.Column="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="2">
+                            <Grid Width="640" Height="640">
+                                <UniformGrid x:Name="ChessBoardGrid" Rows="8" Columns="8"/>
+                                <Canvas x:Name="DragCanvas"
+                                        Width="{Binding ActualWidth, ElementName=ChessBoardGrid}"
+                                        Height="{Binding ActualHeight, ElementName=ChessBoardGrid}"
+                                        IsHitTestVisible="False"/>
+                            </Grid>
+                        </Border>
                     </Grid>
-                </Border>
+                </Viewbox>
             </Grid>
 
             <!-- Player to move indicator -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="25,10,0,0">
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="25,12,0,0">
                 <Border x:Name="PlayerIndicator" Width="20" Height="20" CornerRadius="10" 
                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,8,0"/>
-                <TextBlock x:Name="PlayerToMoveText" Text="White to move" VerticalAlignment="Center" FontSize="14"/>
+                <TextBlock x:Name="PlayerToMoveText" Text="White to move" VerticalAlignment="Center" FontSize="15"/>
             </StackPanel>
         </Grid>
 
         <!-- Move List (right column) -->
         <StackPanel Grid.Column="4">
+            <StackPanel Margin="0,0,0,8">
+                <TextBlock Text="Profile rating" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13"/>
+                <TextBlock x:Name="UserRatingText" Text="Rating: -" FontSize="18" FontWeight="SemiBold" />
+            </StackPanel>
             <DockPanel Margin="0,0,0,5">
-                <TextBlock Text="Moves" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <TextBlock Text="Moves" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <Button x:Name="BtnCopyPgn" Content="Copy PGN" Click="BtnCopyPgn_Click" 
-                        HorizontalAlignment="Right" Padding="8,2" FontSize="11"/>
+                        HorizontalAlignment="Right" Padding="10,4" FontSize="13"/>
             </DockPanel>
             <Border Background="{DynamicResource SurfaceBrush}" 
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4"
@@ -235,7 +242,7 @@ Background="{DynamicResource BackgroundBrush}">
                                     <TextBlock Text="{Binding MoveNumberDisplay}" 
                                                FontFamily="Consolas"
                                                Foreground="{DynamicResource SecondaryTextBrush}"
-                                               FontWeight="Bold" Margin="0,0,3,0"
+                                               FontWeight="Bold" Margin="0,0,3,0" FontSize="14"
                                                VerticalAlignment="Center"
                                                Visibility="{Binding ShowMoveNumber, Converter={StaticResource BoolToVisibility}}"/>
                                     <!-- Move button -->
@@ -243,8 +250,8 @@ Background="{DynamicResource BackgroundBrush}">
                                             Tag="{Binding Index}"
                                             Click="MoveButton_Click"
                                             FontFamily="Consolas"
-                                            Margin="0,2,6,2"
-                                            Padding="4,2"
+                                            Margin="0,3,8,3"
+                                            Padding="6,3"
                                             MinWidth="0"
                                             Background="{Binding Background}"
                                             BorderThickness="0"

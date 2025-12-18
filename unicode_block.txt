@@ -1,0 +1,13 @@
+﻿private static string GetPieceUnicode(Piece piece)
+        {
+            bool isWhite = piece.Owner == Player.White;
+            return piece switch
+            {
+                King => isWhite ? "♔" : "♚",
+                Queen => isWhite ? "♕" : "♛",
+                Rook => isWhite ? "♖" : "♜",
+                Bishop => isWhite ? "♗" : "♝",
+                Knight => isWhite ? "♘" : "♞",
+                Pawn => isWhite ? "♙" : "♟",
+                _ => ""
+            }

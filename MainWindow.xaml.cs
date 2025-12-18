@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.ComponentModel;
+using System.Diagnostics;
 using ChessDotNet;
 using ChessDotNet.Pieces;
 using Lichess_Puzzles.Models;
@@ -122,8 +123,9 @@ namespace Lichess_Puzzles
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.WriteLine($"Failed to load piece image {key}: {ex.Message}");
                     // SVG not found - will fall back to text
                 }
             }
@@ -295,25 +297,38 @@ namespace Lichess_Puzzles
             }
         }
 
-        private void LoadNewPuzzle()
+        private bool TryGetValidatedRatings(out int minRating, out int maxRating)
         {
-            _ratingRecorded = false;
-            if (!int.TryParse(MinRatingBox.Text, out int minRating) || minRating < 0 || minRating > 3500)
+            minRating = 0;
+            maxRating = 0;
+
+            if (!int.TryParse(MinRatingBox.Text, out minRating) || minRating < 0 || minRating > 3500)
             {
-                minRating = 800;
-                MinRatingBox.Text = "800";
+                SetStatus("Invalid minimum rating. Please enter a value between 0 and 3500.", false);
+                return false;
             }
 
-            if (!int.TryParse(MaxRatingBox.Text, out int maxRating) || maxRating < 0 || maxRating > 3500)
+            if (!int.TryParse(MaxRatingBox.Text, out maxRating) || maxRating < 0 || maxRating > 3500)
             {
-                maxRating = 1500;
-                MaxRatingBox.Text = "1500";
+                SetStatus("Invalid maximum rating. Please enter a value between 0 and 3500.", false);
+                return false;
             }
 
             if (maxRating < minRating)
             {
-                maxRating = minRating + 200;
-                MaxRatingBox.Text = maxRating.ToString();
+                SetStatus("Maximum rating must be greater than or equal to minimum rating.", false);
+                return false;
+            }
+
+            return true;
+        }
+
+        private void LoadNewPuzzle()
+        {
+            _ratingRecorded = false;
+            if (!TryGetValidatedRatings(out int minRating, out int maxRating))
+            {
+                return;
             }
 
             var requiredThemes = _activeThemeFilters.Select(f => f.ThemeId).ToList();
@@ -509,10 +524,9 @@ namespace Lichess_Puzzles
                     var position = (Position)border.Tag!;
                     var piece = _game.GetPieceAt(position);
 
-                    // Reset square color
-                    int visualRow = _boardFlipped ? row : 7 - row;
-                    int visualCol = _boardFlipped ? 7 - col : col;
-                    border.Background = (visualRow + visualCol) % 2 == 0 ? _lightSquareBrush : _darkSquareBrush;
+                    // Reset square color based on actual board square to preserve correct dark/light orientation
+                    int colorParity = ((int)position.File + position.Rank) % 2;
+                    border.Background = colorParity == 0 ? _lightSquareBrush : _darkSquareBrush;
 
                     var currentPieceKey = piece != null ? GetPieceKey(piece) : null;
                     var existingChild = border.Child;
@@ -551,8 +565,8 @@ namespace Lichess_Puzzles
                             border.Child = new Image
                             {
                                 Source = image,
-                                Width = 52,
-                                Height = 52,
+                                Width = 60,
+                                Height = 60,
                                 HorizontalAlignment = HorizontalAlignment.Center,
                                 VerticalAlignment = VerticalAlignment.Center,
                                 Tag = pieceKey
@@ -563,7 +577,7 @@ namespace Lichess_Puzzles
                             border.Child = new TextBlock
                             {
                                 Text = GetPieceUnicode(piece),
-                                FontSize = 40,
+                                FontSize = 48,
                                 HorizontalAlignment = HorizontalAlignment.Center,
                                 VerticalAlignment = VerticalAlignment.Center,
                                 Foreground = piece.Owner == Player.White ? Brushes.White : Brushes.Black,
@@ -1451,17 +1465,18 @@ namespace Lichess_Puzzles
             return $"{color}{type}";
         }
 
+        
         private static string GetPieceUnicode(Piece piece)
         {
             bool isWhite = piece.Owner == Player.White;
             return piece switch
             {
-                King => isWhite ? "♔" : "♚",
-                Queen => isWhite ? "♕" : "♛",
-                Rook => isWhite ? "♖" : "♜",
-                Bishop => isWhite ? "♗" : "♝",
-                Knight => isWhite ? "♘" : "♞",
-                Pawn => isWhite ? "♙" : "♟",
+                King => isWhite ? "\u2654" : "\u265A",
+                Queen => isWhite ? "\u2655" : "\u265B",
+                Rook => isWhite ? "\u2656" : "\u265C",
+                Bishop => isWhite ? "\u2657" : "\u265D",
+                Knight => isWhite ? "\u2658" : "\u265E",
+                Pawn => isWhite ? "\u2659" : "\u265F",
                 _ => ""
             };
         }

@@ -57,23 +57,25 @@ public class PuzzleService : IDisposable
 
         if (requiredThemes is { Count: > 0 })
         {
-            var paramNames = requiredThemes
-                .Select((_, i) => $"@theme{i}")
-                .ToList();
+            var paramNames = new List<string>();
+            var valueRows = new List<string>();
+            for (int i = 0; i < requiredThemes.Count; i++)
+            {
+                var paramName = $"@theme{i}";
+                paramNames.Add(paramName);
+                valueRows.Add($"({paramName})");
+                cmd.Parameters.AddWithValue(paramName, requiredThemes[i]);
+            }
 
             whereClauses.Add($@"
                 p.PuzzleId IN (
-                    SELECT PuzzleId 
-                    FROM PuzzleThemes 
-                    WHERE ThemeId IN ({string.Join(", ", paramNames)})
-                    GROUP BY PuzzleId
-                    HAVING COUNT(DISTINCT ThemeId) = {requiredThemes.Count}
+                    SELECT pt.PuzzleId
+                    FROM PuzzleThemes pt
+                    INNER JOIN (VALUES {string.Join(", ", valueRows)}) AS required(ThemeId)
+                        ON pt.ThemeId = required.ThemeId
+                    GROUP BY pt.PuzzleId
+                    HAVING COUNT(DISTINCT pt.ThemeId) = {requiredThemes.Count}
                 )");
-
-            for (int i = 0; i < requiredThemes.Count; i++)
-            {
-                cmd.Parameters.AddWithValue(paramNames[i], requiredThemes[i]);
-            }
         }
 
         if (excludeMateThemes)

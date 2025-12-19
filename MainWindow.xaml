@@ -214,22 +214,27 @@ Background="{DynamicResource BackgroundBrush}">
         </Grid>
 
         <!-- Move List (right column) -->
-        <StackPanel Grid.Column="4">
-            <StackPanel Margin="0,0,0,8">
+        <Grid Grid.Column="4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Profile rating -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,8">
                 <TextBlock Text="Profile rating" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13"/>
                 <TextBlock x:Name="UserRatingText" Text="Rating: -" FontSize="18" FontWeight="SemiBold" />
             </StackPanel>
-            <DockPanel Margin="0,0,0,5">
-                <TextBlock Text="Moves" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button x:Name="BtnCopyPgn" Content="Copy PGN" Click="BtnCopyPgn_Click" 
-                        HorizontalAlignment="Right" Padding="10,4" FontSize="13"/>
-            </DockPanel>
-            <Border Background="{DynamicResource SurfaceBrush}" 
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4"
-                    Padding="8">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" x:Name="MoveListScrollViewer"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl x:Name="MoveListControl">
+            
+            <!-- Puzzle Moves Section -->
+            <StackPanel Grid.Row="1" Margin="0,0,0,15">
+                <TextBlock Text="Puzzle Moves" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Border Background="{DynamicResource SurfaceBrush}" 
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4"
+                        Padding="8">
+                    <ItemsControl x:Name="PuzzleMoveListControl">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel/>
@@ -238,17 +243,15 @@ Background="{DynamicResource BackgroundBrush}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
-                                    <!-- Move number (only for white moves or first black move) -->
                                     <TextBlock Text="{Binding MoveNumberDisplay}" 
                                                FontFamily="Consolas"
                                                Foreground="{DynamicResource SecondaryTextBrush}"
                                                FontWeight="Bold" Margin="0,0,3,0" FontSize="14"
                                                VerticalAlignment="Center"
                                                Visibility="{Binding ShowMoveNumber, Converter={StaticResource BoolToVisibility}}"/>
-                                    <!-- Move button -->
                                     <Button Content="{Binding San}" 
                                             Tag="{Binding Index}"
-                                            Click="MoveButton_Click"
+                                            Click="PuzzleMoveButton_Click"
                                             FontFamily="Consolas"
                                             Margin="0,3,8,3"
                                             Padding="6,3"
@@ -281,8 +284,89 @@ Background="{DynamicResource BackgroundBrush}">
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                </Border>
+            </StackPanel>
+            
+            <!-- Game Moves Section -->
+            <StackPanel x:Name="GameMovesHeader" Grid.Row="2" Margin="0,0,0,5" Visibility="Collapsed">
+                <DockPanel Margin="0,0,0,8">
+                    <TextBlock Text="Source Game" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnCopyPgn" Content="Copy PGN" Click="BtnCopyPgn_Click" 
+                            HorizontalAlignment="Right" Padding="10,4" FontSize="13"/>
+                </DockPanel>
+                <!-- Game metadata -->
+                <StackPanel x:Name="GameMetadataPanel" Margin="0,0,0,8">
+                    <TextBlock x:Name="GamePlayersText" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="GameOpeningText" FontSize="13" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="GameResultText" FontSize="13" Foreground="{DynamicResource SecondaryTextBrush}"/>
+                </StackPanel>
+            </StackPanel>
+            <Border x:Name="GameMovesBorder" Grid.Row="3" Background="{DynamicResource SurfaceBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4"
+                    Padding="8" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" x:Name="GameMoveListScrollViewer"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="GameMoveListControl">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Move number (only for white moves or first black move) -->
+                                    <TextBlock Text="{Binding MoveNumberDisplay}" 
+                                               FontFamily="Consolas"
+                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                               FontWeight="Bold" Margin="0,0,3,0" FontSize="14"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding ShowMoveNumber, Converter={StaticResource BoolToVisibility}}"/>
+                                    <!-- Move button -->
+                                    <Button Content="{Binding San}" 
+                                            Tag="{Binding Index}"
+                                            Click="GameMoveButton_Click"
+                                            FontFamily="Consolas"
+                                            Margin="0,3,8,3"
+                                            Padding="6,3"
+                                            MinWidth="0"
+                                            Background="{Binding Background}"
+                                            BorderThickness="0"
+                                            Cursor="Hand">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" 
+                                                                    CornerRadius="3" 
+                                                                    Padding="{TemplateBinding Padding}">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <!-- Comment/annotation after move -->
+                                    <TextBlock Text="{Binding Comment}" 
+                                               FontFamily="Consolas"
+                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                               FontStyle="Italic" Margin="0,0,8,0" FontSize="13"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding HasComment, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </ScrollViewer>
             </Border>
-        </StackPanel>
+        </Grid>
     </Grid>
 </Window>

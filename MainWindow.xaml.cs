@@ -24,7 +24,9 @@ namespace Lichess_Puzzles
         private ChessGame _game = null!;
         private Position? _selectedPosition;
         private readonly Border[,] _squares = new Border[8, 8];
-        private readonly ObservableCollection<MoveDisplayEntry> _moveList = [];
+        private readonly ObservableCollection<MoveDisplayEntry> _puzzleMoveList = [];
+        private readonly ObservableCollection<GameMoveDisplayEntry> _gameMoveList = [];
+        private readonly List<GameState> _puzzleHistory = [];
         private readonly List<GameState> _gameHistory = [];
         private readonly Dictionary<string, DrawingImage> _pieceImages = [];
         private PuzzleService _puzzleService;
@@ -38,12 +40,17 @@ namespace Lichess_Puzzles
         private readonly ObservableCollection<SelectableTheme> _puzzleThemes = [];
         private readonly ObservableCollection<ThemeFilterItem> _activeThemeFilters = [];
         private bool _skipMateThemes;
+        
+        // Which move list is currently active for navigation
+        private enum ActiveMoveList { Puzzle, Game }
+        private ActiveMoveList _activeMoveList = ActiveMoveList.Puzzle;
 
         // Puzzle state
         private Puzzle? _currentPuzzle;
         private string[] _solutionMoves = [];
         private int _currentMoveIndex;
-        private int _displayedMoveIndex = -1; // -1 means showing current position
+        private int _puzzleDisplayedMoveIndex = -1; // For puzzle move list navigation
+        private int _gameDisplayedMoveIndex = -1;   // For game move list navigation
         private bool _puzzleSolved;
         private bool _puzzleFailed;
         private bool _boardFlipped;
@@ -53,7 +60,6 @@ namespace Lichess_Puzzles
         // Source game data
         private GameData? _sourceGame;
         private int _puzzleStartPly; // The ply number where the puzzle begins
-        private int _lastPuzzleMoveIndex; // Index in _gameHistory of the last puzzle move
         private Position? _dragStartPosition;
         private Point _dragStartPoint;
         private bool _isDragging;
@@ -77,7 +83,8 @@ namespace Lichess_Puzzles
             _userProfileService = new UserProfileService();
             _puzzleService = new PuzzleService();
             _lichessGameService = new LichessGameService();
-            MoveListControl.ItemsSource = _moveList;
+            PuzzleMoveListControl.ItemsSource = _puzzleMoveList;
+            GameMoveListControl.ItemsSource = _gameMoveList;
             ThemesControl.ItemsSource = _puzzleThemes;
             ActiveThemeFiltersControl.ItemsSource = _activeThemeFilters;
             _activeThemeFilters.CollectionChanged += (_, _) => UpdateActiveFiltersPlaceholder();
@@ -87,6 +94,10 @@ namespace Lichess_Puzzles
             LoadPieceImages();
             InitializeBoard();
             
+            // Add keyboard event handler
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
+            Focusable = true;
+            
             try
             {
                 LoadNewPuzzle();
@@ -94,6 +105,40 @@ namespace Lichess_Puzzles
             catch (Exception ex)
             {
                 SetStatus($"Error loading puzzle: {ex.Message}", false);
+            }
+        }
+        
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Left)
+            {
+                NavigateMoves(-1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Right)
+            {
+                NavigateMoves(1);
+                e.Handled = true;
+            }
+        }
+        
+        private void NavigateMoves(int direction)
+        {
+            if (_activeMoveList == ActiveMoveList.Puzzle)
+            {
+                var newIndex = _puzzleDisplayedMoveIndex + direction;
+                if (newIndex >= 0 && newIndex < _puzzleHistory.Count)
+                {
+                    GoToPuzzleMove(newIndex);
+                }
+            }
+            else
+            {
+                var newIndex = _gameDisplayedMoveIndex + direction;
+                if (newIndex >= 0 && newIndex < _gameHistory.Count)
+                {
+                    GoToGameMove(newIndex);
+                }
             }
         }
 
@@ -142,7 +187,8 @@ namespace Lichess_Puzzles
             if (refreshBoard && _currentPuzzle != null)
             {
                 UpdateBoard();
-                UpdateMoveListHighlight();
+                UpdatePuzzleMoveListHighlight();
+                UpdateGameMoveListHighlight();
             }
         }
 
@@ -351,14 +397,18 @@ namespace Lichess_Puzzles
             
             _solutionMoves = allMoves;
             _currentMoveIndex = 0;
-            _displayedMoveIndex = -1;
+            _puzzleDisplayedMoveIndex = 0;
+            _gameDisplayedMoveIndex = -1;
             _puzzleSolved = false;
             _puzzleFailed = false;
-            _moveList.Clear();
+            _puzzleMoveList.Clear();
+            _gameMoveList.Clear();
+            _puzzleHistory.Clear();
             _gameHistory.Clear();
+            _activeMoveList = ActiveMoveList.Puzzle;
 
             // Save initial state
-            _gameHistory.Add(new GameState(_game.GetFen(), null, null, 0));
+            _puzzleHistory.Add(new GameState(_game.GetFen(), null, null, 0));
 
             // Determine player color
             _playerColor = _game.WhoseTurn;
@@ -380,7 +430,8 @@ namespace Lichess_Puzzles
             UpdatePuzzleInfo();
             UpdateBoard();
             UpdatePlayerIndicator();
-            UpdateMoveListHighlight();
+            UpdatePuzzleMoveListHighlight();
+            HideSourceGameMoves();
             SetStatus("Find the best move!", false);
             
             // Start fetching the source game in the background
@@ -399,6 +450,9 @@ namespace Lichess_Puzzles
                 // Calculate the puzzle start ply from the URL
                 var plyFromUrl = LichessGameService.ExtractPlyFromUrl(_currentPuzzle.GameUrl);
                 _puzzleStartPly = plyFromUrl ?? 0;
+                
+                // Populate the game move list on UI thread
+                await Dispatcher.InvokeAsync(() => PopulateGameMoveList());
             }
             catch (Exception ex)
             {
@@ -489,6 +543,18 @@ namespace Lichess_Puzzles
             ActiveFiltersPlaceholder.Visibility = _activeThemeFilters.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        }
+        
+        private void ShowSourceGameMoves()
+        {
+            GameMovesHeader.Visibility = Visibility.Visible;
+            GameMovesBorder.Visibility = Visibility.Visible;
+        }
+        
+        private void HideSourceGameMoves()
+        {
+            GameMovesHeader.Visibility = Visibility.Collapsed;
+            GameMovesBorder.Visibility = Visibility.Collapsed;
         }
 
         private void SkipMateThemesCheckbox_Changed(object sender, RoutedEventArgs e)
@@ -597,9 +663,9 @@ namespace Lichess_Puzzles
         private void Square_Click(object sender, MouseButtonEventArgs e)
         {
             // If viewing history, return to current position first
-            if (_displayedMoveIndex >= 0 && _displayedMoveIndex < _gameHistory.Count - 1)
+            if (_puzzleDisplayedMoveIndex >= 0 && _puzzleDisplayedMoveIndex < _puzzleHistory.Count - 1)
             {
-                GoToMove(_gameHistory.Count - 1);
+                GoToPuzzleMove(_puzzleHistory.Count - 1);
                 return;
             }
 
@@ -667,9 +733,9 @@ namespace Lichess_Puzzles
                 return;
             }
 
-            if (_displayedMoveIndex >= 0 && _displayedMoveIndex < _gameHistory.Count - 1)
+            if (_puzzleDisplayedMoveIndex >= 0 && _puzzleDisplayedMoveIndex < _puzzleHistory.Count - 1)
             {
-                GoToMove(_gameHistory.Count - 1);
+                GoToPuzzleMove(_puzzleHistory.Count - 1);
                 ResetDragState();
                 return;
             }
@@ -835,7 +901,7 @@ namespace Lichess_Puzzles
                 // Correct move
                 var san = GetSanNotation(_game, move);
                 _game.MakeMove(move, true);
-                AddMoveToList(move, san);
+                AddMoveToPuzzleList(move, san);
                 _currentMoveIndex++;
 
                 if (_currentMoveIndex >= _solutionMoves.Length)
@@ -843,15 +909,16 @@ namespace Lichess_Puzzles
                     // Puzzle solved!
                     _puzzleSolved = true;
                     SetStatus("✓ Puzzle solved!", true);
-                    ShowFullGameMoveList();
-                    UpdateMoveListHighlight();
+                    UpdatePuzzleMoveListHighlight();
+                    UpdateGameMoveListHighlight();
+                    ShowSourceGameMoves();
                     RecordPuzzleResult(true);
                 }
                 else
                 {
                     // Make opponent's response
                     SetStatus("Correct! Keep going...", true);
-                    UpdateMoveListHighlight();
+                    UpdatePuzzleMoveListHighlight();
                     Dispatcher.BeginInvoke(async () =>
                     {
                         await Task.Delay(500);
@@ -864,21 +931,22 @@ namespace Lichess_Puzzles
                             {
                                 _puzzleSolved = true;
                                 SetStatus("✓ Puzzle solved!", true);
-                                ShowFullGameMoveList();
+                                UpdateGameMoveListHighlight();
+                                ShowSourceGameMoves();
                                 RecordPuzzleResult(true);
                             }
                             else
                             {
                                 SetStatus("Your turn!", false);
                             }
-                            UpdateMoveListHighlight();
+                            UpdatePuzzleMoveListHighlight();
                         }
                     });
                 }
             }
             else
             {
-                // Wrong move
+            // Wrong move
                 _puzzleFailed = true;
                 SetStatus($"✗ Incorrect. The best move was {FormatMove(expectedMove)}", false);
                 RecordPuzzleResult(false);
@@ -899,7 +967,7 @@ namespace Lichess_Puzzles
             {
                 var san = GetSanNotation(_game, move);
                 _game.MakeMove(move, true);
-                AddMoveToList(move, san);
+                AddMoveToPuzzleList(move, san);
                 UpdateBoard();
             }
         }
@@ -1017,10 +1085,16 @@ namespace Lichess_Puzzles
 
         private void ApplySanDisplayPreference()
         {
-            for (int i = 0; i < _moveList.Count; i++)
+            for (int i = 0; i < _puzzleMoveList.Count; i++)
             {
-                var entry = _moveList[i];
-                _moveList[i] = entry with { San = FormatSanForDisplay(entry.RawSan) };
+                var entry = _puzzleMoveList[i];
+                _puzzleMoveList[i] = entry with { San = FormatSanForDisplay(entry.RawSan) };
+            }
+            
+            for (int i = 0; i < _gameMoveList.Count; i++)
+            {
+                var entry = _gameMoveList[i];
+                _gameMoveList[i] = entry with { San = FormatSanForDisplay(entry.RawSan) };
             }
         }
 
@@ -1119,7 +1193,7 @@ namespace Lichess_Puzzles
             return null;
         }
 
-        private void AddMoveToList(Move move, string san)
+        private void AddMoveToPuzzleList(Move move, string san)
         {
             // The player who just moved (opposite of whose turn it is now)
             bool isWhiteMove = _game.WhoseTurn == Player.Black;
@@ -1130,8 +1204,8 @@ namespace Lichess_Puzzles
             bool initialWhiteToMove = _initialFen.Split(' ')[1] == "w";
             
             // Calculate the actual move number
-            // _moveList.Count is the number of half-moves already recorded
-            int halfMovesMade = _moveList.Count;
+            // _puzzleMoveList.Count is the number of half-moves already recorded
+            int halfMovesMade = _puzzleMoveList.Count;
             int moveNumber;
             
             if (initialWhiteToMove)
@@ -1151,7 +1225,7 @@ namespace Lichess_Puzzles
 
             // Save game state
             var fen = _game.GetFen();
-            _gameHistory.Add(new GameState(fen, move, san, _gameHistory.Count));
+            _puzzleHistory.Add(new GameState(fen, move, san, _puzzleHistory.Count));
 
             // Add check/checkmate suffix
             var currentSan = san;
@@ -1162,12 +1236,12 @@ namespace Lichess_Puzzles
 
             // Create display entry
             // Show move number for white moves, or for black's first move if puzzle starts with black
-            bool showMoveNumber = isWhiteMove || (_moveList.Count == 0 && !initialWhiteToMove);
+            bool showMoveNumber = isWhiteMove || (_puzzleMoveList.Count == 0 && !initialWhiteToMove);
             string moveNumberDisplay = isWhiteMove ? $"{moveNumber}." : $"{moveNumber}...";
 
             var entry = new MoveDisplayEntry
             {
-                Index = _gameHistory.Count - 1,
+                Index = _puzzleHistory.Count - 1,
                 RawSan = currentSan,
                 San = FormatSanForDisplay(currentSan),
                 MoveNumber = moveNumber,
@@ -1177,15 +1251,9 @@ namespace Lichess_Puzzles
                 Background = TransparentBrush
             };
 
-            _moveList.Add(entry);
-            _displayedMoveIndex = _gameHistory.Count - 1;
-            UpdateMoveListHighlight();
-
-            // Scroll to end
-            Dispatcher.BeginInvoke(() =>
-            {
-                MoveListScrollViewer.ScrollToEnd();
-            }, System.Windows.Threading.DispatcherPriority.Background);
+            _puzzleMoveList.Add(entry);
+            _puzzleDisplayedMoveIndex = _puzzleHistory.Count - 1;
+            UpdatePuzzleMoveListHighlight();
         }
 
         private static int GetFullmoveFromFen(string fen)
@@ -1196,63 +1264,78 @@ namespace Lichess_Puzzles
             return 1;
         }
 
-        private void UpdateMoveListHighlight()
+        private void UpdatePuzzleMoveListHighlight()
         {
-            int currentIndex = _displayedMoveIndex >= 0 ? _displayedMoveIndex : _gameHistory.Count - 1;
+            int currentIndex = _puzzleDisplayedMoveIndex >= 0 ? _puzzleDisplayedMoveIndex : _puzzleHistory.Count - 1;
 
-            for (int i = 0; i < _moveList.Count; i++)
+            for (int i = 0; i < _puzzleMoveList.Count; i++)
             {
-                var entry = _moveList[i];
+                var entry = _puzzleMoveList[i];
                 var isCurrentMove = entry.Index == currentIndex;
+                
+                SolidColorBrush background = isCurrentMove ? CurrentMoveBrush : TransparentBrush;
+                    
+                _puzzleMoveList[i] = entry with { Background = background };
+            }
+        }
+        
+        private void UpdateGameMoveListHighlight()
+        {
+            int currentIndex = _gameDisplayedMoveIndex >= 0 ? _gameDisplayedMoveIndex : -1;
+            int puzzleStartPly = _puzzleStartPly;
+            int puzzleEndPly = puzzleStartPly + _solutionMoves.Length;
+
+            for (int i = 0; i < _gameMoveList.Count; i++)
+            {
+                var entry = _gameMoveList[i];
+                var isCurrentMove = entry.Index == currentIndex;
+                int ply = i + 1; // Moves are 1-indexed by ply
+                bool isPuzzleMove = ply > puzzleStartPly && ply <= puzzleEndPly;
                 
                 SolidColorBrush background;
                 if (isCurrentMove)
                     background = CurrentMoveBrush;
-                else if (entry.IsPuzzleMove)
+                else if (isPuzzleMove && _puzzleSolved)
                     background = PuzzleMoveBrush;
                 else
                     background = TransparentBrush;
                     
-                _moveList[i] = entry with { Background = background };
+                _gameMoveList[i] = entry with { Background = background };
             }
         }
         
-        private void ShowFullGameMoveList()
+        private void PopulateGameMoveList()
         {
             if (_sourceGame == null || _sourceGame.Moves.Count == 0) return;
             
-            // Save the current board position (FEN) to restore after rebuilding history
-            var currentFen = _game.GetFen();
-            
-            // Clear current move list and game history
-            _moveList.Clear();
+            _gameMoveList.Clear();
             _gameHistory.Clear();
+            
+            // Update game metadata display
+            UpdateGameMetadataDisplay();
             
             // Start from the beginning of the game
             var game = new ChessGame();
             _gameHistory.Add(new GameState(game.GetFen(), null, null, 0));
             
             // Determine which ply range contains the puzzle moves
-            // _puzzleStartPly is the ply where the puzzle position is shown (before the setup move)
             int puzzleStartPly = _puzzleStartPly;
             int puzzleEndPly = puzzleStartPly + _solutionMoves.Length;
-            _lastPuzzleMoveIndex = -1;
-            int currentPositionIndex = -1;
             
             // Process all moves from the source game
             for (int i = 0; i < _sourceGame.Moves.Count; i++)
             {
-                var sanMove = _sourceGame.Moves[i];
+                var moveData = _sourceGame.Moves[i];
                 int currentPly = i + 1; // Ply is 1-indexed
                 
                 try
                 {
                     // Parse SAN and make the move
-                    var move = ParseSanMove(game, sanMove);
+                    var move = ParseSanMove(game, moveData.San);
                     if (move == null) break;
                     
                     // Determine if this is a puzzle move
-                    bool isPuzzleMove = currentPly > puzzleStartPly && currentPly <= puzzleEndPly;
+                    bool isPuzzleMove = _puzzleSolved && currentPly > puzzleStartPly && currentPly <= puzzleEndPly;
                     
                     // Calculate move number
                     bool isWhiteMove = game.WhoseTurn == Player.White;
@@ -1261,8 +1344,8 @@ namespace Lichess_Puzzles
                     // Make the move
                     game.MakeMove(move, true);
                     
-                    // Add check/checkmate suffix
-                    var displaySan = sanMove;
+                    // Add check/checkmate suffix if not already present
+                    var displaySan = moveData.San;
                     if (!displaySan.EndsWith('+') && !displaySan.EndsWith('#'))
                     {
                         if (game.IsInCheck(game.WhoseTurn))
@@ -1275,23 +1358,11 @@ namespace Lichess_Puzzles
                     var fen = game.GetFen();
                     _gameHistory.Add(new GameState(fen, move, displaySan, _gameHistory.Count));
                     
-                    // Track the last puzzle move index
-                    if (isPuzzleMove)
-                    {
-                        _lastPuzzleMoveIndex = _gameHistory.Count - 1;
-                    }
-                    
-                    // Check if this position matches the current board position
-                    if (fen.Split(' ')[0] == currentFen.Split(' ')[0])
-                    {
-                        currentPositionIndex = _gameHistory.Count - 1;
-                    }
-                    
                     // Create display entry
-                    bool showMoveNumber = isWhiteMove || _moveList.Count == 0;
+                    bool showMoveNumber = isWhiteMove || _gameMoveList.Count == 0;
                     string moveNumberDisplay = isWhiteMove ? $"{moveNumber}." : $"{moveNumber}...";
                     
-                    var entry = new MoveDisplayEntry
+                    var entry = new GameMoveDisplayEntry
                     {
                         Index = _gameHistory.Count - 1,
                         RawSan = displaySan,
@@ -1301,10 +1372,13 @@ namespace Lichess_Puzzles
                         ShowMoveNumber = showMoveNumber,
                         MoveNumberDisplay = moveNumberDisplay,
                         IsPuzzleMove = isPuzzleMove,
+                        Comment = moveData.Comment ?? "",
+                        HasComment = !string.IsNullOrEmpty(moveData.Comment),
+                        Nag = moveData.Nag ?? "",
                         Background = isPuzzleMove ? PuzzleMoveBrush : TransparentBrush
                     };
                     
-                    _moveList.Add(entry);
+                    _gameMoveList.Add(entry);
                 }
                 catch
                 {
@@ -1313,23 +1387,7 @@ namespace Lichess_Puzzles
                 }
             }
             
-            // Restore the displayed position to match the current board
-            // Use the index we found that matches the current FEN, or fall back to last puzzle move
-            if (currentPositionIndex > 0)
-            {
-                _displayedMoveIndex = currentPositionIndex;
-            }
-            else if (_lastPuzzleMoveIndex > 0)
-            {
-                _displayedMoveIndex = _lastPuzzleMoveIndex;
-            }
-            else
-            {
-                _displayedMoveIndex = _gameHistory.Count - 1;
-            }
-            
-            // Don't change the board - just update the highlight
-            UpdateMoveListHighlight();
+            _gameDisplayedMoveIndex = -1; // Not navigating game list initially
         }
         
         private static Move? ParseSanMove(ChessGame game, string san)
@@ -1429,24 +1487,78 @@ namespace Lichess_Puzzles
             return move;
         }
 
-        private void MoveButton_Click(object sender, RoutedEventArgs e)
+        private void PuzzleMoveButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is int index)
             {
-                GoToMove(index);
+                GoToPuzzleMove(index);
+            }
+        }
+        
+        private void GameMoveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is int index)
+            {
+                GoToGameMove(index);
             }
         }
 
-        private void GoToMove(int historyIndex)
+        private void GoToPuzzleMove(int historyIndex)
+        {
+            if (historyIndex < 0 || historyIndex >= _puzzleHistory.Count) return;
+
+            var state = _puzzleHistory[historyIndex];
+            _game = new ChessGame(state.Fen);
+            _puzzleDisplayedMoveIndex = historyIndex;
+            _activeMoveList = ActiveMoveList.Puzzle;
+
+            UpdateBoard();
+            UpdatePuzzleMoveListHighlight();
+        }
+        
+        private void GoToGameMove(int historyIndex)
         {
             if (historyIndex < 0 || historyIndex >= _gameHistory.Count) return;
 
             var state = _gameHistory[historyIndex];
             _game = new ChessGame(state.Fen);
-            _displayedMoveIndex = historyIndex;
+            _gameDisplayedMoveIndex = historyIndex;
+            _activeMoveList = ActiveMoveList.Game;
 
             UpdateBoard();
-            UpdateMoveListHighlight();
+            UpdateGameMoveListHighlight();
+        }
+        
+        private void UpdateGameMetadataDisplay()
+        {
+            if (_sourceGame == null)
+            {
+                GamePlayersText.Text = "";
+                GameOpeningText.Text = "";
+                GameResultText.Text = "";
+                return;
+            }
+            
+            // Build players string with ratings
+            var whiteName = !string.IsNullOrEmpty(_sourceGame.WhitePlayer) ? _sourceGame.WhitePlayer : "White";
+            var blackName = !string.IsNullOrEmpty(_sourceGame.BlackPlayer) ? _sourceGame.BlackPlayer : "Black";
+            
+            var whiteRating = _sourceGame.WhiteElo.HasValue ? $" ({_sourceGame.WhiteElo})" : "";
+            var blackRating = _sourceGame.BlackElo.HasValue ? $" ({_sourceGame.BlackElo})" : "";
+            
+            GamePlayersText.Text = $"{whiteName}{whiteRating} vs {blackName}{blackRating}";
+            
+            // Build opening string
+            var openingParts = new List<string>();
+            if (!string.IsNullOrEmpty(_sourceGame.Eco))
+                openingParts.Add(_sourceGame.Eco);
+            if (!string.IsNullOrEmpty(_sourceGame.Opening))
+                openingParts.Add(_sourceGame.Opening);
+            
+            GameOpeningText.Text = openingParts.Count > 0 ? string.Join(": ", openingParts) : "";
+            
+            // Result
+            GameResultText.Text = !string.IsNullOrEmpty(_sourceGame.Result) ? $"Result: {_sourceGame.Result}" : "";
         }
 
         private static string GetPieceKey(Piece piece)
@@ -1486,9 +1598,9 @@ namespace Lichess_Puzzles
             if (_puzzleSolved || _puzzleFailed || _currentMoveIndex >= _solutionMoves.Length) return;
 
             // Make sure we're at the current position
-            if (_displayedMoveIndex >= 0 && _displayedMoveIndex < _gameHistory.Count - 1)
+            if (_puzzleDisplayedMoveIndex >= 0 && _puzzleDisplayedMoveIndex < _puzzleHistory.Count - 1)
             {
-                GoToMove(_gameHistory.Count - 1);
+                GoToPuzzleMove(_puzzleHistory.Count - 1);
             }
 
             var hint = _solutionMoves[_currentMoveIndex];
@@ -1521,15 +1633,16 @@ namespace Lichess_Puzzles
             _game = new ChessGame(_currentPuzzle.Fen);
             _solutionMoves = _currentPuzzle.GetMoveList();
             _currentMoveIndex = 0;
-            _displayedMoveIndex = -1;
+            _puzzleDisplayedMoveIndex = 0;
             _puzzleSolved = false;
             _puzzleFailed = false;
             _ratingRecorded = false;
-            _moveList.Clear();
-            _gameHistory.Clear();
+            _puzzleMoveList.Clear();
+            _puzzleHistory.Clear();
+            _activeMoveList = ActiveMoveList.Puzzle;
 
             // Save initial state
-            _gameHistory.Add(new GameState(_game.GetFen(), null, null, 0));
+            _puzzleHistory.Add(new GameState(_game.GetFen(), null, null, 0));
 
             // Make setup move
             if (_solutionMoves.Length > 0)
@@ -1539,7 +1652,7 @@ namespace Lichess_Puzzles
             }
 
             UpdateBoard();
-            UpdateMoveListHighlight();
+            UpdatePuzzleMoveListHighlight();
             SetStatus("Find the best move!", false);
         }
 
@@ -1656,25 +1769,34 @@ namespace Lichess_Puzzles
             {
                 for (int i = 0; i < _sourceGame.Moves.Count; i++)
                 {
+                    var moveData = _sourceGame.Moves[i];
                     if (i % 2 == 0)
                     {
                         if (i > 0) sb.Append(' ');
                         sb.Append($"{(i / 2) + 1}.");
                     }
-                    sb.Append($" {_sourceGame.Moves[i]}");
+                    sb.Append($" {moveData.San}");
+                    
+                    // Include NAG if present
+                    if (!string.IsNullOrEmpty(moveData.Nag))
+                        sb.Append($" {moveData.Nag}");
+                    
+                    // Include comment if present
+                    if (!string.IsNullOrEmpty(moveData.Comment))
+                        sb.Append($" {{{moveData.Comment}}}");
                 }
                 if (!string.IsNullOrEmpty(_sourceGame.Result))
                     sb.Append($" {_sourceGame.Result}");
             }
             else
             {
-                // Generate PGN from game history (puzzle moves only)
+                // Generate PGN from puzzle history (puzzle moves only)
                 bool initialWhiteToMove = _initialFen.Split(' ')[1] == "w";
                 int initialFullmove = GetFullmoveFromFen(_initialFen);
                 
-                for (int i = 1; i < _gameHistory.Count; i++)
+                for (int i = 1; i < _puzzleHistory.Count; i++)
                 {
-                    var state = _gameHistory[i];
+                    var state = _puzzleHistory[i];
                     if (state.San == null) continue;
                     
                     bool isWhiteMove = (initialWhiteToMove && (i % 2 == 1)) || (!initialWhiteToMove && (i % 2 == 0));
@@ -1721,7 +1843,22 @@ namespace Lichess_Puzzles
         public bool IsWhiteMove { get; init; }
         public bool ShowMoveNumber { get; init; }
         public string MoveNumberDisplay { get; init; } = "";
+        public SolidColorBrush Background { get; init; } = new(Colors.Transparent);
+    }
+    
+    public record GameMoveDisplayEntry
+    {
+        public int Index { get; init; }
+        public string RawSan { get; init; } = "";
+        public string San { get; init; } = "";
+        public int MoveNumber { get; init; }
+        public bool IsWhiteMove { get; init; }
+        public bool ShowMoveNumber { get; init; }
+        public string MoveNumberDisplay { get; init; } = "";
         public bool IsPuzzleMove { get; init; }
+        public string Comment { get; init; } = "";
+        public bool HasComment { get; init; }
+        public string Nag { get; init; } = "";
         public SolidColorBrush Background { get; init; } = new(Colors.Transparent);
     }
 

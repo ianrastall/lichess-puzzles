@@ -124,22 +124,106 @@ public partial class LichessGameService : IDisposable
         {
             var movesText = movesSection.Groups[1].Value;
             
-            // Remove comments {}, variations (), result, and move numbers
-            movesText = CommentsRegex().Replace(movesText, "");
-            movesText = VariationsRegex().Replace(movesText, "");
-            movesText = ResultRegex().Replace(movesText, "");
-            movesText = MoveNumbersRegex().Replace(movesText, " ");
-            movesText = MultipleSpacesRegex().Replace(movesText, " ").Trim();
-
-            // Split into individual moves (SAN notation from PGN)
-            var sanMoves = movesText.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Where(m => !string.IsNullOrWhiteSpace(m))
-                .ToList();
-
-            gameData.Moves = sanMoves;
+            // Parse moves with their associated comments and NAGs
+            gameData.Moves = ParseMovesWithAnnotations(movesText);
         }
 
         return gameData;
+    }
+    
+    private static List<MoveData> ParseMovesWithAnnotations(string movesText)
+    {
+        var moves = new List<MoveData>();
+        
+        // Remove variations (parentheses) - we don't handle them yet
+        movesText = VariationsRegex().Replace(movesText, "");
+        
+        // Remove result at the end
+        movesText = ResultRegex().Replace(movesText, "");
+        
+        // Split into tokens (preserving comments and NAGs)
+        var tokens = TokenizeMovesRegex().Matches(movesText);
+        
+        string? currentMove = null;
+        string? currentComment = null;
+        string? currentNag = null;
+        
+        foreach (Match token in tokens)
+        {
+            var text = token.Value.Trim();
+            if (string.IsNullOrEmpty(text)) continue;
+            
+            // Check if it's a comment
+            if (text.StartsWith('{') && text.EndsWith('}'))
+            {
+                currentComment = text[1..^1].Trim();
+                continue;
+            }
+            
+            // Check if it's a NAG (Numeric Annotation Glyph like $1, $2, etc.)
+            if (text.StartsWith('$') && int.TryParse(text[1..], out var nagNum))
+            {
+                currentNag = ConvertNagToSymbol(nagNum);
+                continue;
+            }
+            
+            // Check if it's a move number (skip it)
+            if (MoveNumbersRegex().IsMatch(text))
+            {
+                continue;
+            }
+            
+            // It's a move - save the previous one if exists
+            if (currentMove != null)
+            {
+                moves.Add(new MoveData 
+                { 
+                    San = currentMove,
+                    Comment = currentComment,
+                    Nag = currentNag
+                });
+                currentComment = null;
+                currentNag = null;
+            }
+            
+            currentMove = text;
+        }
+        
+        // Don't forget the last move
+        if (currentMove != null)
+        {
+            moves.Add(new MoveData 
+            { 
+                San = currentMove,
+                Comment = currentComment,
+                Nag = currentNag
+            });
+        }
+        
+        return moves;
+    }
+    
+    private static string ConvertNagToSymbol(int nag)
+    {
+        return nag switch
+        {
+            1 => "!",      // Good move
+            2 => "?",      // Poor move
+            3 => "!!",     // Very good move
+            4 => "??",     // Very poor move (blunder)
+            5 => "!?",     // Speculative move
+            6 => "?!",     // Questionable move
+            7 => "?",      // Forced move
+            10 => "=",     // Equal position
+            13 => "?",     // Unclear position
+            14 => "?",     // White has a slight advantage
+            15 => "?",     // Black has a slight advantage
+            16 => "±",     // White has a moderate advantage
+            17 => "?",     // Black has a moderate advantage
+            18 => "+?",    // White has a decisive advantage
+            19 => "?+",    // Black has a decisive advantage
+            _ => $"${nag}" // Unknown NAG, keep as-is
+        };
     }
 
     /// <summary>
@@ -189,6 +273,9 @@ public partial class LichessGameService : IDisposable
 
     [GeneratedRegex(@"#(\d+)")]
     private static partial Regex PlyRegex();
+
+    [GeneratedRegex(@"\{[^}]*\}|\$\d+|\d+\.+|\S+")]
+    private static partial Regex TokenizeMovesRegex();
 }
 
 public class GameData
@@ -204,5 +291,12 @@ public class GameData
     public string TimeControl { get; set; } = "";
     public string Eco { get; set; } = "";
     public string Opening { get; set; } = "";
-    public List<string> Moves { get; set; } = [];
+    public List<MoveData> Moves { get; set; } = [];
+}
+
+public class MoveData
+{
+    public string San { get; set; } = "";
+    public string? Comment { get; set; }
+    public string? Nag { get; set; }
 }

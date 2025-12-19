@@ -80,13 +80,13 @@ public class PuzzleService : IDisposable
 
         if (excludeMateThemes)
         {
+            // Only exclude simple mate puzzles (mate-in-1 and mate-in-2)
+            // Longer mating sequences are still allowed
             whereClauses.Add("""
                 p.PuzzleId NOT IN (
                     SELECT PuzzleId 
                     FROM PuzzleThemes 
-                    WHERE ThemeId = 'mate'
-                       OR LOWER(ThemeId) LIKE 'matein%'
-                       OR ThemeId LIKE '%Mate'
+                    WHERE ThemeId IN ('mateIn1', 'mateIn2')
                 )
                 """);
         }
@@ -141,7 +141,7 @@ public class PuzzleService : IDisposable
         if (string.IsNullOrWhiteSpace(themeId))
             throw new ArgumentException("Theme ID cannot be empty", nameof(themeId));
 
-        return GetRandomPuzzle(minRating, maxRating, new[] { themeId });
+        return GetRandomPuzzle(minRating, maxRating, [themeId]);
     }
 
     public List<Theme> GetAllThemes()

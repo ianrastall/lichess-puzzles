@@ -25,7 +25,7 @@ public partial class LichessGameService : IDisposable
     }
 
     /// <summary>
-    /// Fetches a game from Lichess by game ID and returns the moves in UCI format.
+    /// Fetches a game from Lichess by game ID and returns the moves with annotations.
     /// </summary>
     public async Task<GameData?> GetGameAsync(string gameUrl, CancellationToken cancellationToken = default)
     {
@@ -36,15 +36,19 @@ public partial class LichessGameService : IDisposable
             if (string.IsNullOrEmpty(gameId))
                 return null;
 
-            // Fetch PGN from Lichess API
-            var pgnUrl = $"game/export/{gameId}?pgnInJson=false&clocks=false&evals=false";
+            // Fetch PGN from Lichess API with annotations enabled
+            // literate=true adds text annotations, evals=true includes engine evaluations
+            var pgnUrl = $"game/export/{gameId}?pgnInJson=false&clocks=false&evals=true&literate=true&opening=true";
             var response = await _httpClient.GetAsync(pgnUrl, cancellationToken);
             
             if (!response.IsSuccessStatusCode)
                 return null;
 
             var pgn = await response.Content.ReadAsStringAsync(cancellationToken);
-            return ParsePgn(pgn, gameUrl);
+            var gameData = ParsePgn(pgn, gameUrl);
+            if (gameData != null)
+                gameData.RawPgn = pgn;
+            return gameData;
         }
         catch (OperationCanceledException)
         {
@@ -136,7 +140,8 @@ public partial class LichessGameService : IDisposable
         var moves = new List<MoveData>();
         
         // Remove variations (parentheses) - we don't handle them yet
-        movesText = VariationsRegex().Replace(movesText, "");
+        // Handle nested parentheses by repeatedly removing innermost variations
+        movesText = RemoveNestedVariations(movesText);
         
         // Remove result at the end
         movesText = ResultRegex().Replace(movesText, "");
@@ -173,6 +178,13 @@ public partial class LichessGameService : IDisposable
                 continue;
             }
             
+            // Validate that this looks like a chess move before accepting it
+            // Valid moves start with: piece letters (KQRBN), file letters (a-h), or castling (O-O)
+            if (!IsLikelyChessMove(text))
+            {
+                continue;
+            }
+            
             // It's a move - save the previous one if exists
             if (currentMove != null)
             {
@@ -201,6 +213,66 @@ public partial class LichessGameService : IDisposable
         }
         
         return moves;
+    }
+    
+    /// <summary>
+    /// Checks if a token looks like it could be a valid chess move in SAN notation.
+    /// </summary>
+    private static bool IsLikelyChessMove(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        
+        // Remove trailing annotation symbols for checking (including Unicode variants)
+        var clean = StripAnnotationSuffix(text);
+        if (string.IsNullOrEmpty(clean)) return false;
+        
+        // Castling
+        if (clean is "O-O" or "O-O-O" or "0-0" or "0-0-0")
+            return true;
+        
+        // Must start with a piece letter (K, Q, R, B, N) or a file letter (a-h)
+        char first = clean[0];
+        if (!"KQRBNabcdefgh".Contains(first))
+            return false;
+        
+        // Must contain at least one file letter and one rank digit
+        bool hasFile = clean.Any(c => c >= 'a' && c <= 'h');
+        bool hasRank = clean.Any(c => c >= '1' && c <= '8');
+        
+        return hasFile && hasRank;
+    }
+    
+    /// <summary>
+    /// Strips annotation symbols from the end of a move string.
+    /// Handles !, ?, !!, ??, !?, ?!, +, #, and Unicode variants.
+    /// Note: Does NOT strip '=' as it's used for promotion notation (e.g., e8=Q)
+    /// </summary>
+    private static string StripAnnotationSuffix(string move)
+    {
+        if (string.IsNullOrEmpty(move)) return move;
+        
+        // Keep stripping known annotation characters from the end
+        // This handles combinations like "Nxe5?!" or "Qh7+!" 
+        while (move.Length > 0)
+        {
+            char last = move[^1];
+            // Standard annotations and check/mate symbols
+            // Note: '=' is NOT included - it's used for promotion (e8=Q)
+            if (last is '!' or '?' or '+' or '#' or 
+                // Unicode annotation symbols
+                '?' or '?' or '?' or '?' or
+                // Other possible symbols (position evaluation)
+                '?' or '?' or '?' or '±' or '?' or '?')
+            {
+                move = move[..^1];
+            }
+            else
+            {
+                break;
+            }
+        }
+        
+        return move;
     }
     
     private static string ConvertNagToSymbol(int nag)
@@ -259,8 +331,26 @@ public partial class LichessGameService : IDisposable
     [GeneratedRegex(@"\{[^}]*\}")]
     private static partial Regex CommentsRegex();
 
-    [GeneratedRegex(@"\([^)]*\)")]
-    private static partial Regex VariationsRegex();
+    // Removed VariationsRegex - using RemoveNestedVariations method instead for nested parens support
+    
+    /// <summary>
+    /// Removes nested variations (parentheses) from PGN text by repeatedly removing innermost variations.
+    /// </summary>
+    private static string RemoveNestedVariations(string text)
+    {
+        // Keep removing innermost parentheses until none remain
+        string previous;
+        do
+        {
+            previous = text;
+            text = SimpleParensRegex().Replace(text, "");
+        } while (text != previous);
+        
+        return text;
+    }
+    
+    [GeneratedRegex(@"\([^()]*\)")]
+    private static partial Regex SimpleParensRegex();
 
     [GeneratedRegex(@"(1-0|0-1|1/2-1/2|\*)")]
     private static partial Regex ResultRegex();
@@ -292,6 +382,7 @@ public class GameData
     public string Eco { get; set; } = "";
     public string Opening { get; set; } = "";
     public List<MoveData> Moves { get; set; } = [];
+    public string RawPgn { get; set; } = "";
 }
 
 public class MoveData

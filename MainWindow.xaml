@@ -119,11 +119,11 @@ Background="{DynamicResource BackgroundBrush}">
                 <TextBlock x:Name="ActiveFiltersPlaceholder" Text="No filters applied"
                            Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" Margin="0,2,0,0"/>
 
-                <CheckBox x:Name="SkipMateThemesCheckbox" Content="Skip mate puzzles"
+                <CheckBox x:Name="SkipSimpleMatesCheckbox" Content="Skip simple mate puzzles"
                           Margin="0,10,0,0"
                           FontSize="14"
-                          Checked="SkipMateThemesCheckbox_Changed"
-                          Unchecked="SkipMateThemesCheckbox_Changed"/>
+                          Checked="SkipSimpleMatesCheckbox_Changed"
+                          Unchecked="SkipSimpleMatesCheckbox_Changed"/>
             </StackPanel>
 
             <!-- Controls -->
@@ -230,7 +230,11 @@ Background="{DynamicResource BackgroundBrush}">
             
             <!-- Puzzle Moves Section -->
             <StackPanel Grid.Row="1" Margin="0,0,0,15">
-                <TextBlock Text="Puzzle Moves" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <DockPanel Margin="0,0,0,5">
+                    <TextBlock Text="Puzzle Moves" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnCopyEpd" Content="Copy EPD" Click="BtnCopyEpd_Click" 
+                            HorizontalAlignment="Right" Padding="10,4" FontSize="13"/>
+                </DockPanel>
                 <Border Background="{DynamicResource SurfaceBrush}" 
                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4"
                         Padding="8">

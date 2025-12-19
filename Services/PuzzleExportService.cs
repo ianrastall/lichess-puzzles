@@ -36,8 +36,18 @@ public class PuzzleExportService
         var total = await GetPuzzleCountAsync(connection, cancellationToken);
         status?.Report($"Found {total:N0} puzzles...");
 
+        // Fetch themes once for EPD export (keyed by PuzzleId)
+        Dictionary<string, List<string>>? puzzleThemes = null;
+        if (format == ExportFormat.Epd)
+        {
+            status?.Report("Loading themes...");
+            puzzleThemes = await LoadAllPuzzleThemesAsync(connection, cancellationToken);
+        }
+
         await using var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT PuzzleId, Fen, Moves, Rating, GameUrl FROM Puzzles";
+        cmd.CommandText = format == ExportFormat.Epd
+            ? "SELECT PuzzleId, Fen, Moves, Rating, RatingDeviation, Popularity, NbPlays, GameUrl, OpeningTags FROM Puzzles"
+            : "SELECT PuzzleId, Fen, Moves, Rating, GameUrl FROM Puzzles";
 
         await using var reader = await cmd.ExecuteReaderAsync(
             System.Data.CommandBehavior.SequentialAccess,
@@ -57,17 +67,24 @@ public class PuzzleExportService
             var fen = reader.GetString(1);
             var moves = reader.GetString(2);
             var rating = reader.GetInt32(3);
-            var gameUrl = reader.IsDBNull(4) ? null : reader.GetString(4);
 
             buffer.Clear();
 
             if (format == ExportFormat.Pgn)
             {
+                var gameUrl = reader.IsDBNull(4) ? null : reader.GetString(4);
                 WritePgnEntry(buffer, puzzleId, fen, moves, rating, gameUrl);
             }
             else
             {
-                WriteEpdEntry(buffer, puzzleId, fen, moves, rating);
+                var ratingDeviation = reader.GetInt32(4);
+                var popularity = reader.GetInt32(5);
+                var nbPlays = reader.GetInt32(6);
+                var gameUrl = reader.IsDBNull(7) ? null : reader.GetString(7);
+                var openingTags = reader.IsDBNull(8) ? null : reader.GetString(8);
+                var themes = puzzleThemes?.GetValueOrDefault(puzzleId);
+                
+                WriteEpdEntry(buffer, puzzleId, fen, moves, rating, popularity, nbPlays, gameUrl, openingTags, themes);
             }
 
             await writer.WriteAsync(buffer.ToString());
@@ -93,6 +110,32 @@ public class PuzzleExportService
         return scalar is long l ? l : Convert.ToInt64(scalar);
     }
 
+    private static async Task<Dictionary<string, List<string>>> LoadAllPuzzleThemesAsync(
+        SqliteConnection connection, 
+        CancellationToken token)
+    {
+        var result = new Dictionary<string, List<string>>();
+        
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT PuzzleId, ThemeId FROM PuzzleThemes ORDER BY PuzzleId";
+        
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            var puzzleId = reader.GetString(0);
+            var themeId = reader.GetString(1);
+            
+            if (!result.TryGetValue(puzzleId, out var themes))
+            {
+                themes = [];
+                result[puzzleId] = themes;
+            }
+            themes.Add(themeId);
+        }
+        
+        return result;
+    }
+
     private static void WritePgnEntry(StringBuilder buffer, string puzzleId, string fen, string moves, int rating, string? gameUrl)
     {
         buffer.AppendLine($"[Event \"Lichess Puzzle {puzzleId}\"]");
@@ -109,23 +152,66 @@ public class PuzzleExportService
         buffer.AppendLine();
     }
 
-    private static void WriteEpdEntry(StringBuilder buffer, string puzzleId, string fen, string moves, int rating)
+    private static void WriteEpdEntry(
+        StringBuilder buffer, 
+        string puzzleId, 
+        string fen, 
+        string moves, 
+        int rating,
+        int popularity,
+        int nbPlays,
+        string? gameUrl,
+        string? openingTags,
+        List<string>? themes)
     {
+        // EPD format matching the reference:
+        // position id "xxx" bm Move pv Move1 Move2... c0 "Rating/Popularity/Plays" c1 "Themes" c2 "Game" [c3 "Opening"];
+        
         var fenParts = fen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var epdFen = fenParts.Length >= 4 ? string.Join(' ', fenParts.Take(4)) : fen;
         var sanMoves = BuildSanMoves(fen, moves, out _, out _);
 
+        // Position
         buffer.Append(epdFen);
-        buffer.Append($" ; id \"{puzzleId}\"");
-        buffer.Append($" ; rtg {rating}");
-
+        
+        // Puzzle ID
+        buffer.Append($" id \"{puzzleId}\"");
+        
+        // Best move (player's first move, after opponent's setup move)
+        if (sanMoves.Count > 1)
+        {
+            buffer.Append($" bm {sanMoves[1]}");
+        }
+        
+        // Principal variation (all moves)
         if (sanMoves.Count > 0)
         {
-            buffer.Append(" ; pm ");
-            buffer.Append(string.Join(' ', sanMoves));
+            buffer.Append($" pv {string.Join(" ", sanMoves)}");
         }
-
-        buffer.AppendLine();
+        
+        // c0: Rating, Popularity, Plays
+        buffer.Append($" c0 \"Rating: {rating}, Popularity: {popularity}, Plays: {nbPlays}\"");
+        
+        // c1: Themes
+        if (themes is { Count: > 0 })
+        {
+            buffer.Append($" c1 \"Themes: {string.Join(" ", themes)}\"");
+        }
+        
+        // c2: Game URL
+        if (!string.IsNullOrEmpty(gameUrl))
+        {
+            buffer.Append($" c2 \"Game: {gameUrl}\"");
+        }
+        
+        // c3: Opening tags
+        if (!string.IsNullOrEmpty(openingTags))
+        {
+            var openingFormatted = openingTags.Replace(" ", "_");
+            buffer.Append($" c3 \"Opening: {openingFormatted}\"");
+        }
+        
+        buffer.AppendLine(";");
     }
 
     private static List<string> BuildSanMoves(string fen, string moves, out bool whiteToMove, out int fullmoveNumber)

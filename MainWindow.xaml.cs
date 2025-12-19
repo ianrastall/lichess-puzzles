@@ -89,7 +89,7 @@ namespace Lichess_Puzzles
             ActiveThemeFiltersControl.ItemsSource = _activeThemeFilters;
             _activeThemeFilters.CollectionChanged += (_, _) => UpdateActiveFiltersPlaceholder();
             UpdateActiveFiltersPlaceholder();
-            _skipMateThemes = SkipMateThemesCheckbox.IsChecked == true;
+            _skipMateThemes = SkipSimpleMatesCheckbox.IsChecked == true;
             LoadProfiles();
             LoadPieceImages();
             InitializeBoard();
@@ -231,7 +231,7 @@ namespace Lichess_Puzzles
 
         private void LoadProfiles()
         {
-            _profiles = _userProfileService.GetProfiles().ToList();
+            _profiles = [.. _userProfileService.GetProfiles()];
 
             _currentUser = _profiles.FirstOrDefault(p => p.Id == _settings.SelectedUserId) 
                            ?? _profiles.FirstOrDefault();
@@ -239,7 +239,7 @@ namespace Lichess_Puzzles
             if (_currentUser == null)
             {
                 _currentUser = _userProfileService.AddProfile("Player 1");
-                _profiles = _userProfileService.GetProfiles().ToList();
+                _profiles = [.. _userProfileService.GetProfiles()];
             }
 
             UserCombo.ItemsSource = _profiles;
@@ -282,7 +282,7 @@ namespace Lichess_Puzzles
             if (result == true)
             {
                 var created = _userProfileService.AddProfile(dlg.UserName);
-                _profiles = _userProfileService.GetProfiles().ToList();
+                _profiles = [.. _userProfileService.GetProfiles()];
                 UserCombo.ItemsSource = _profiles;
                 UserCombo.SelectedValue = created.Id;
                 _currentUser = created;
@@ -345,7 +345,6 @@ namespace Lichess_Puzzles
 
         private bool TryGetValidatedRatings(out int minRating, out int maxRating)
         {
-            minRating = 0;
             maxRating = 0;
 
             if (!int.TryParse(MinRatingBox.Text, out minRating) || minRating < 0 || minRating > 3500)
@@ -377,7 +376,7 @@ namespace Lichess_Puzzles
                 return;
             }
 
-            var requiredThemes = _activeThemeFilters.Select(f => f.ThemeId).ToList();
+            List<string> requiredThemes = [.. _activeThemeFilters.Select(f => f.ThemeId)];
             var puzzle = _puzzleService.GetRandomPuzzle(minRating, maxRating, requiredThemes, _skipMateThemes);
 
             if (puzzle == null)
@@ -557,9 +556,9 @@ namespace Lichess_Puzzles
             GameMovesBorder.Visibility = Visibility.Collapsed;
         }
 
-        private void SkipMateThemesCheckbox_Changed(object sender, RoutedEventArgs e)
+        private void SkipSimpleMatesCheckbox_Changed(object sender, RoutedEventArgs e)
         {
-            _skipMateThemes = SkipMateThemesCheckbox.IsChecked == true;
+            _skipMateThemes = SkipSimpleMatesCheckbox.IsChecked == true;
         }
 
         private void UpdatePlayerIndicator()
@@ -1332,7 +1331,11 @@ namespace Lichess_Puzzles
                 {
                     // Parse SAN and make the move
                     var move = ParseSanMove(game, moveData.San);
-                    if (move == null) break;
+                    if (move == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to parse move: '{moveData.San}' at ply {currentPly}");
+                        break; // Can't continue since game state would be desynced
+                    }
                     
                     // Determine if this is a puzzle move
                     bool isPuzzleMove = _puzzleSolved && currentPly > puzzleStartPly && currentPly <= puzzleEndPly;
@@ -1380,9 +1383,10 @@ namespace Lichess_Puzzles
                     
                     _gameMoveList.Add(entry);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Stop processing if we can't parse a move
+                    // Stop processing if we can't parse a move - game state would be corrupted
+                    System.Diagnostics.Debug.WriteLine($"Error processing move '{moveData.San}': {ex.Message}");
                     break;
                 }
             }
@@ -1392,8 +1396,11 @@ namespace Lichess_Puzzles
         
         private static Move? ParseSanMove(ChessGame game, string san)
         {
-            // Remove check/checkmate symbols for parsing
-            san = san.TrimEnd('+', '#');
+            // Strip all annotation symbols from the end (!, ?, !!, ??, !?, ?!, +, #, and Unicode variants)
+            san = StripMoveAnnotations(san);
+            
+            // Skip empty or invalid moves
+            if (string.IsNullOrWhiteSpace(san)) return null;
             
             // Handle castling
             if (san == "O-O" || san == "0-0")
@@ -1486,6 +1493,39 @@ namespace Lichess_Puzzles
             
             return move;
         }
+        
+        /// <summary>
+        /// Strips annotation symbols from the end of a move string.
+        /// Handles !, ?, !!, ??, !?, ?!, +, #, and Unicode variants.
+        /// Note: Does NOT strip '=' as it's used for promotion notation (e.g., e8=Q)
+        /// </summary>
+        private static string StripMoveAnnotations(string move)
+        {
+            if (string.IsNullOrEmpty(move)) return move;
+            
+            // Keep stripping known annotation characters from the end
+            // This handles combinations like "Nxe5?!" or "Qh7+!" 
+            while (move.Length > 0)
+            {
+                char last = move[^1];
+                // Standard annotations and check/mate symbols
+                // Note: '=' is NOT included - it's used for promotion (e8=Q)
+                if (last is '!' or '?' or '+' or '#' or 
+                    // Unicode annotation symbols
+                    '⁈' or '⁉' or '‼' or '⁇' or
+                    // Other possible symbols from Lichess (position evaluation)
+                    '‽' or '⩲' or '⩱' or '±' or '∓' or '∞')
+                {
+                    move = move[..^1];
+                }
+                else
+                {
+                    break;
+                }
+            }
+            
+            return move;
+        }
 
         private void PuzzleMoveButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1549,7 +1589,7 @@ namespace Lichess_Puzzles
             GamePlayersText.Text = $"{whiteName}{whiteRating} vs {blackName}{blackRating}";
             
             // Build opening string
-            var openingParts = new List<string>();
+            List<string> openingParts = [];
             if (!string.IsNullOrEmpty(_sourceGame.Eco))
                 openingParts.Add(_sourceGame.Eco);
             if (!string.IsNullOrEmpty(_sourceGame.Opening))
@@ -1717,12 +1757,122 @@ namespace Lichess_Puzzles
         
         private void BtnCopyPgn_Click(object sender, RoutedEventArgs e)
         {
-            var pgn = GeneratePgn();
+            // Use the raw PGN from Lichess if available, otherwise generate it
+            string pgn;
+            if (_sourceGame != null && !string.IsNullOrEmpty(_sourceGame.RawPgn))
+            {
+                pgn = _sourceGame.RawPgn;
+            }
+            else
+            {
+                pgn = GeneratePgn();
+            }
+            
             if (!string.IsNullOrEmpty(pgn))
             {
                 Clipboard.SetText(pgn);
                 SetStatus("PGN copied to clipboard!", null);
             }
+        }
+        
+        private void BtnCopyEpd_Click(object sender, RoutedEventArgs e)
+        {
+            var epd = GenerateEpd();
+            if (!string.IsNullOrEmpty(epd))
+            {
+                Clipboard.SetText(epd);
+                SetStatus("EPD copied to clipboard!", null);
+            }
+        }
+        
+        private string GenerateEpd()
+        {
+            if (_currentPuzzle == null) return "";
+            
+            // EPD format: position id "xxx" bm Move pv Move1 Move2... c0 "Rating/Popularity/Plays" c1 "Themes" c2 "Game" [c3 "Opening"]
+            var fen = _currentPuzzle.Fen;
+            var fenParts = fen.Split(' ');
+            
+            // EPD consists of: piece placement, active color, castling, en passant
+            var epd = new System.Text.StringBuilder();
+            epd.Append(string.Join(" ", fenParts.Take(4)));
+            
+            // Add puzzle ID
+            epd.Append($" id \"{_currentPuzzle.PuzzleId}\"");
+            
+            // Build the principal variation (pv) by converting all solution moves to SAN
+            var game = new ChessGame(_currentPuzzle.Fen);
+            List<string> sanMoves = [];
+            
+            foreach (var uciMove in _solutionMoves)
+            {
+                var move = ParseUciMove(game, uciMove);
+                if (move == null) break;
+                
+                var san = GetSanNotation(game, move);
+                game.MakeMove(move, true);
+                
+                // Add check/checkmate suffix
+                if (game.IsInCheck(game.WhoseTurn))
+                {
+                    san += game.IsCheckmated(game.WhoseTurn) ? "#" : "+";
+                }
+                
+                sanMoves.Add(san);
+            }
+            
+            // Add best move (bm) - the player's first move (after opponent's setup move)
+            if (sanMoves.Count > 1)
+            {
+                epd.Append($" bm {sanMoves[1]}");
+            }
+            
+            // Add principal variation (pv) - all moves
+            if (sanMoves.Count > 0)
+            {
+                epd.Append($" pv {string.Join(" ", sanMoves)}");
+            }
+            
+            // c0: Rating, Popularity, Plays
+            epd.Append($" c0 \"Rating: {_currentPuzzle.Rating}, Popularity: {_currentPuzzle.Popularity}, Plays: {_currentPuzzle.NbPlays}\"");
+            
+            // c1: Themes
+            if (_currentPuzzle.Themes.Count > 0)
+            {
+                var themeIds = string.Join(" ", _currentPuzzle.Themes.Select(t => t.ThemeId));
+                epd.Append($" c1 \"Themes: {themeIds}\"");
+            }
+            
+            // c2: Game URL (if available)
+            if (!string.IsNullOrEmpty(_currentPuzzle.GameUrl))
+            {
+                epd.Append($" c2 \"Game: {_currentPuzzle.GameUrl}\"");
+            }
+            
+            // c3: Opening tags (if available)
+            if (!string.IsNullOrEmpty(_currentPuzzle.OpeningTags))
+            {
+                // OpeningTags are stored with spaces, convert to underscores for EPD format
+                var openingFormatted = _currentPuzzle.OpeningTags.Replace(" ", "_");
+                epd.Append($" c3 \"Opening: {openingFormatted}\"");
+            }
+            
+            epd.Append(';');
+            
+            return epd.ToString();
+        }
+        
+        private static Move? ParseUciMove(ChessGame game, string uci)
+        {
+            if (uci.Length < 4) return null;
+            
+            var from = ParsePosition(uci[..2]);
+            var to = ParsePosition(uci[2..4]);
+            char? promotion = uci.Length == 5 ? char.ToUpper(uci[4]) : null;
+            
+            return promotion.HasValue
+                ? new Move(from, to, game.WhoseTurn, promotion.Value)
+                : new Move(from, to, game.WhoseTurn);
         }
         
         private string GeneratePgn()
@@ -1864,16 +2014,10 @@ namespace Lichess_Puzzles
 
     public record GameState(string Fen, Move? Move, string? San, int Index);
 
-    public class SelectableTheme : INotifyPropertyChanged
+    public class SelectableTheme(string themeId, string displayName) : INotifyPropertyChanged
     {
-        public SelectableTheme(string themeId, string displayName)
-        {
-            ThemeId = themeId;
-            DisplayName = displayName;
-        }
-
-        public string ThemeId { get; }
-        public string DisplayName { get; }
+        public string ThemeId { get; } = themeId;
+        public string DisplayName { get; } = displayName;
 
         private bool _isSelected;
         public bool IsSelected

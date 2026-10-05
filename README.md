@@ -1,33 +1,127 @@
-# Lichess Puzzles
+# Lichess Puzzle Desktop
 
-Windows desktop app (WPF/.NET 8) for practicing Lichess puzzles locally.
+A dark-mode Windows desktop app for playing puzzles from the
+[Lichess puzzle database](https://database.lichess.org/#puzzles) offline.
+
+- **Shell:** C# 14, .NET 10, WinUI 3 (Windows App SDK), MVVM with CommunityToolkit.Mvvm
+- **Core:** C++20 behind a plain C ABI (`lpd_core.dll`) — chess rules, the puzzle database,
+  solution checking, export and evaluation all live here
 
 ## Features
-- Downloads the official Lichess puzzle dump (~250 MB .zst) and builds a local SQLite database of ~5.6M puzzles.
-- Play puzzles on a drag-and-drop board that flips to the side to move; click any move in the list to jump to that position.
-- Filter by rating range, get a hint, retry the current puzzle, or load the next one with a single click.
-- Shows puzzle themes and status; copy a PGN of the puzzle (includes source game metadata when available).
-- Refresh the puzzle database at any time from inside the app.
+
+- Board with click-to-move and drag-and-drop, legal-move markers, promotion picker, Merida pieces
+- Move notation (SAN) with click and arrow-key navigation
+- Hint, show solution, retry, next puzzle; any checkmating move is accepted as a solution
+- Filters: rating range, minimum popularity and plays, themes, opening, skip already-played puzzles
+- Jump to a puzzle by id
+- Evaluation bar and principal variation from a built-in engine (hidden while solving by default)
+- History of played puzzles with a clean-solve count and streak
+- Export:
+  - current puzzle as PGN (copy or save) and its FEN
+  - every puzzle matching the filters as PGN or CSV
+  - every puzzle you have played as PGN
 
 ## Requirements
-- Windows 10/11
-- .NET 8 SDK
-- Internet access for the initial/refresh puzzle download
 
-## Run the app
-1) Restore/build/run: `dotnet run --project "Lichess Puzzles.csproj"` (or open the solution in Visual Studio 2022 and press F5).
-2) On first launch, the app prompts to download the puzzle database (~250 MB). It is unpacked to SQLite at `%LOCALAPPDATA%\LichessPuzzles\chess_puzzles.db`.
-3) After the download completes, a puzzle loads automatically. Use the rating boxes if you want to narrow the range before clicking `Next`.
+- Windows 10 1809 or later, x64
+- .NET 10 SDK
+- Visual Studio 2022 or later with the **Desktop development with C++** workload
+  (MSVC x64 tools, and CMake + Ninja — either Visual Studio's or your own on `PATH`)
+- PowerShell 7 (`pwsh`), used by the native build step
 
-## Using it
-- Move pieces by click-then-click or drag-and-drop.
-- `Hint` highlights the from-square of the next move; `Retry` restarts the current puzzle; `Next` loads another random puzzle within the selected rating range.
-- Click moves in the move list to rewind/inspect; `Copy PGN` copies a PGN built from the puzzle (or its source game, if fetched).
-- `Update Puzzle Database` re-downloads and rebuilds the local database to get the latest puzzles.
+## Build and run
 
-## Notes
-- The puzzle database lives at `%LOCALAPPDATA%\LichessPuzzles\chess_puzzles.db`. Delete it if you want to force a fresh download.
-- NuGet packages restore automatically on build (ChessDotNet, Microsoft.Data.Sqlite, SharpVectors.Wpf, WPF-UI, ZstdSharp.Port).
+```
+dotnet run --project app/LichessPuzzleDesktop -c Release
+```
 
-## License
-MIT License. See `LICENSE`.
+The app project builds the native core first by calling `build-core.ps1`, then copies
+`lpd_core.dll` next to the executable. The Windows App SDK runtime is bundled, so nothing
+else needs installing.
+
+To build the core on its own and run its self-checks (perft, SAN, puzzle replay, PGN, engine):
+
+```
+pwsh ./build-core.ps1 -Configuration Release -Test
+```
+
+`LichessPuzzleDesktop.slnx` opens in Visual Studio.
+
+## Getting the puzzles
+
+The app starts with a 13-puzzle sample (`samples/sample_puzzles.csv`). For the full set:
+
+1. Download `lichess_db_puzzle.csv.zst` from <https://database.lichess.org/#puzzles>.
+2. Decompress it, for example with `zstd -d lichess_db_puzzle.csv.zst`.
+3. Choose **Open database…** (Ctrl+O) and pick the `.csv`.
+
+The file is memory-mapped and indexed in memory at roughly 33 bytes per puzzle; the last
+database you opened is reloaded on the next start.
+
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| Left / Right | Step back / forward through the moves |
+| Home / End | First / latest position |
+| Ctrl+N | Next puzzle |
+| Ctrl+O | Open database |
+| Ctrl+S | Save the current puzzle as PGN |
+
+## Layout
+
+```
+core/
+  include/lpd_core.h    the C ABI (the only header the app depends on)
+  src/chess.*           position, move generation, FEN, UCI, SAN
+  src/db.cpp            memory-mapped CSV index, filtering, bulk export
+  src/session.cpp       puzzle state machine: move checking, hints, navigation
+  src/puzzle.*          CSV row parsing and PGN generation
+  src/engine.cpp        alpha-beta search used for the evaluation
+  src/history.*         log of played puzzles
+  tests/core_tests.cpp  self-checks
+app/LichessPuzzleDesktop/
+  Interop/              P/Invoke declarations mirroring lpd_core.h
+  Core/                 thin managed wrappers over the native handles
+  ViewModels/           MainViewModel and item view models
+  Controls/ChessBoard   board rendering and pointer input
+  Services/             settings, file pickers, clipboard, dialogs
+  Assets/pieces/        Merida piece SVGs
+samples/                bundled sample puzzles
+build-core.ps1          builds the native core with MSVC + CMake + Ninja
+```
+
+Settings and history are stored in `%LOCALAPPDATA%\LichessPuzzleDesktop`.
+
+## PGN format
+
+Each puzzle is one game with `SetUp`/`FEN` tags and the full solution as the movetext.
+By default the game starts from the FEN in the database, so the opponent's move comes first
+and is followed by a comment marking where the puzzle begins; **Export → Start PGN at the
+player's move** starts from the position shown to the player instead. Puzzle metadata is
+written as `PuzzleId`, `PuzzleRating`, `PuzzleRatingDeviation`, `PuzzlePopularity`,
+`PuzzlePlays` and `PuzzleThemes` tags, with the source game in `Source`.
+
+## Limitations
+
+- The evaluation comes from a small built-in engine, not Stockfish. It finds short mates and
+  simple tactics quickly but is only a rough guide on hard positions.
+- After a puzzle is finished you can step through the solution, but not play your own
+  side lines.
+- x64 only. Chess960 castling is not supported (the Lichess puzzle set does not need it).
+
+## Earlier version
+
+Versions 1.0–1.2 of this repository were a WPF/.NET 8 app that imported the puzzles into
+SQLite. That code is still available under the `1.0.0`, `1.1.0` and `1.2.0` tags.
+
+## Credits and licences
+
+- Code: MIT, see `LICENSE`.
+- Puzzles: the Lichess puzzle database, released under
+  [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+- Piece set: Merida by Armando Hernandez Marroquin, taken from
+  [lichess-org/lila](https://github.com/lichess-org/lila/tree/master/public/piece/merida),
+  licensed [GPLv2+](https://www.gnu.org/licenses/gpl-2.0.txt). Distributing the app with
+  these files means complying with that licence.
+- Piece-square tables in the engine follow Tomasz Michniewski's "simplified evaluation function".

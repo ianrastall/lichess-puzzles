@@ -1,5 +1,0 @@
-﻿GetPieceUnicode(piece),
-                                FontSize = 40,
-                                HorizontalAlignment = HorizontalAlignment.Center,
-                                VerticalAlignment = VerticalAlignment.Center,
-                                Foreground = piece.Owner == Player.Wh

@@ -7,8 +7,9 @@ x64/
 x86/
 build/
 publish/
+artifacts/
 
-# Visual Studio files
+# Visual Studio
 .vs/
 *.suo
 *.user
@@ -16,11 +17,15 @@ publish/
 *.sln.docstates
 *.userprefs
 
-# Visual Studio cache/options directory
-.vs/
-
-# Rider
+# Rider / ReSharper
 .idea/
+*.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Visual Studio Code
+.vscode/
 
 # NuGet
 *.nupkg
@@ -30,45 +35,24 @@ publish/
 *.nuget.targets
 project.lock.json
 project.fragment.lock.json
-artifacts/
 
-# Windows image file caches
+# OS files
 Thumbs.db
 ehthumbs.db
-
-# Folder config file
 Desktop.ini
-
-# Mac
 .DS_Store
 
-# Resharper
-_ReSharper*/
-*.[Rr]e[Ss]harper
-*.DotSettings.user
-
-# JetBrains Rider
-*.sln.iml
-
-# Visual Studio Code
-.vscode/
-
-# Windows Installer files
-*.cab
-*.msi
-*.msm
-*.msp
-
-# Logs
+# Logs and test results
 *.log
 logs/
-
-# Test Results
 TestResults/
 [Tt]est[Rr]esult*/
 *.trx
 *.coverage
 *.coveragexml
 
-# Application-specific
+# Puzzle databases are large; only the bundled sample is tracked
 *.db
+*.csv
+*.csv.zst
+!samples/sample_puzzles.csv

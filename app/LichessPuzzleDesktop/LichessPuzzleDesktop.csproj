@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>LichessPuzzleDesktop</RootNamespace>
+    <AssemblyName>LichessPuzzleDesktop</AssemblyName>
+    <AssemblyTitle>Lichess Puzzle Desktop</AssemblyTitle>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <!-- Unpackaged app that carries the Windows App SDK runtime with it. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+
+  <!-- Native core: built by build-core.ps1 (MSVC + CMake) and copied next to the exe. -->
+  <PropertyGroup>
+    <RepoRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '..', '..'))</RepoRoot>
+    <NativeConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</NativeConfiguration>
+    <NativeConfiguration Condition="'$(NativeConfiguration)' == ''">Release</NativeConfiguration>
+    <NativeCoreDll>$(RepoRoot)core\build\$(NativeConfiguration)\lpd_core.dll</NativeCoreDll>
+  </PropertyGroup>
+
+  <!-- Merida piece set, loaded from disk by ChessBoard. -->
+  <ItemGroup>
+    <Content Remove="Assets\pieces\*.svg" />
+    <None Remove="Assets\pieces\*.svg" />
+    <None Include="Assets\pieces\*.svg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <NativeCoreSource Include="$(RepoRoot)core\CMakeLists.txt;$(RepoRoot)core\include\**\*;$(RepoRoot)core\src\**\*" />
+    <None Include="$(NativeCoreDll)" Link="lpd_core.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(RepoRoot)samples\sample_puzzles.csv" Link="samples\sample_puzzles.csv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="BuildNativeCore" BeforeTargets="BeforeBuild" Inputs="@(NativeCoreSource)" Outputs="$(NativeCoreDll)">
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(RepoRoot)build-core.ps1&quot; -Configuration $(NativeConfiguration)" />
+  </Target>
+
+</Project>

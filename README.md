@@ -21,7 +21,17 @@ A dark-mode Windows desktop app for playing puzzles from the
   - every puzzle matching the filters as PGN or CSV
   - every puzzle you have played as PGN
 
-## Requirements
+## Install
+
+Download `LichessPuzzleDesktop-<version>-Setup.exe` from the
+[releases page](https://github.com/ianrastall/lichess-puzzles/releases) and run it. It installs
+for the current user without an administrator prompt, adds a Start menu entry and can be
+removed from **Settings → Apps**. Nothing else is needed: the .NET and Windows App SDK runtimes
+are included. The installer is not code-signed, so Windows SmartScreen may ask you to confirm.
+
+## Building from source
+
+Requirements:
 
 - Windows 10 1809 or later, x64
 - .NET 10 SDK
@@ -29,7 +39,7 @@ A dark-mode Windows desktop app for playing puzzles from the
   (MSVC x64 tools, and CMake + Ninja — either Visual Studio's or your own on `PATH`)
 - PowerShell 7 (`pwsh`), used by the native build step
 
-## Build and run
+Build and run:
 
 ```
 dotnet run --project app/LichessPuzzleDesktop -c Release
@@ -46,6 +56,23 @@ pwsh ./build-core.ps1 -Configuration Release -Test
 ```
 
 `LichessPuzzleDesktop.slnx` opens in Visual Studio.
+
+### Installer and releases
+
+With [Inno Setup 6](https://jrsoftware.org/isdl.php) installed, this publishes a self-contained
+build and compiles `artifacts\installer\LichessPuzzleDesktop-<version>-Setup.exe`:
+
+```
+pwsh ./build-installer.ps1
+```
+
+The version comes from `<Version>` in the app project. To publish a release, set that version,
+commit, then push a matching tag — CI builds the installer and attaches it to a new GitHub release:
+
+```
+git tag 2.0.0
+git push origin 2.0.0
+```
 
 ## Getting the puzzles
 
@@ -88,7 +115,9 @@ app/LichessPuzzleDesktop/
   Services/             settings, file pickers, clipboard, dialogs
   Assets/pieces/        Merida piece SVGs
 samples/                bundled sample puzzles
+installer/              Inno Setup script
 build-core.ps1          builds the native core with MSVC + CMake + Ninja
+build-installer.ps1     publishes the app and compiles the installer
 ```
 
 Settings and history are stored in `%LOCALAPPDATA%\LichessPuzzleDesktop`.

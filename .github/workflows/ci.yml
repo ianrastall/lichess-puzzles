@@ -2,8 +2,14 @@ name: Build
 
 on:
   push:
+    branches: ['**']
+    # A version tag such as 2.0.0 also publishes a GitHub release with the installer.
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -21,12 +27,44 @@ jobs:
         shell: pwsh
         run: ./build-core.ps1 -Configuration Release -Test
 
-      - name: Build app (Release, x64)
-        run: dotnet build LichessPuzzleDesktop.slnx -c Release
+      - name: Install Inno Setup if missing
+        shell: pwsh
+        run: |
+          $found = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ }
+          if (-not $found) { choco install innosetup --yes --no-progress }
 
-      - name: Upload artifact (win-x64)
+      - name: Publish app and build installer
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { ./build-installer.ps1 -Version $env:GITHUB_REF_NAME }
+          else { ./build-installer.ps1 }
+
+      - name: Upload installer
         if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v7
         with:
-          name: lichess-puzzle-desktop-win-x64
-          path: app/LichessPuzzleDesktop/bin/Release/net10.0-windows10.0.19041.0/win-x64/
+          name: lichess-puzzle-desktop-setup
+          path: artifacts/installer/*.exe
+          if-no-files-found: error
+
+  release:
+    if: ${{ github.ref_type == 'tag' }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installer
+        uses: actions/download-artifact@v8
+        with:
+          name: lichess-puzzle-desktop-setup
+          path: installer
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" installer/*.exe
+          --repo "$GITHUB_REPOSITORY"
+          --title "Lichess Puzzle Desktop $GITHUB_REF_NAME"
+          --generate-notes

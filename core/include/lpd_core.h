@@ -31,12 +31,13 @@
 extern "C" {
 #endif
 
-#define LPD_ABI_VERSION 1
+#define LPD_ABI_VERSION 2
 
 typedef struct lpd_db lpd_db;
 typedef struct lpd_session lpd_session;
 typedef struct lpd_engine lpd_engine;
 typedef struct lpd_history lpd_history;
+typedef struct lpd_players lpd_players;
 
 enum {
     LPD_OK = 0,
@@ -103,6 +104,11 @@ LPD_API int LPD_CALL lpd_db_filtered_count(const lpd_db* db);
 LPD_API int LPD_CALL lpd_db_filtered_row(const lpd_db* db, int index);
 /* A uniformly random row of the filtered set, or LPD_ERR_NOT_FOUND when it is empty. */
 LPD_API int LPD_CALL lpd_db_random_row(lpd_db* db);
+/*
+ * A random row of the filtered set whose rating lies within target +/- spread. When nothing is
+ * that close the window is widened until something is found.
+ */
+LPD_API int LPD_CALL lpd_db_random_row_near(lpd_db* db, int target_rating, int spread);
 
 /* ------------------------------------------------------------------ export */
 
@@ -237,7 +243,7 @@ typedef struct lpd_history_entry {
     int32_t mistakes;
     int32_t hints;
     int32_t seconds;
-    int32_t reserved;
+    int32_t player_rating; /* the player's rating after the attempt, 0 when it was not rated */
 } lpd_history_entry;
 
 /* Opens (creating if needed) the history file. NULL path = in-memory only. */
@@ -248,6 +254,53 @@ LPD_API int LPD_CALL lpd_history_count(const lpd_history* h);
 LPD_API int LPD_CALL lpd_history_get(const lpd_history* h, int index, lpd_history_entry* out);
 LPD_API int LPD_CALL lpd_history_contains(const lpd_history* h, const char* id);
 LPD_API int LPD_CALL lpd_history_clear(lpd_history* h);
+
+/* ----------------------------------------------------------------- ratings */
+
+/* A Glicko-2 rating on the familiar scale (1500 = average, deviation in rating points). */
+typedef struct lpd_rating {
+    double rating;
+    double deviation;
+    double volatility;
+} lpd_rating;
+
+/* 1500 / 350 / 0.06, the rating of someone who has not played yet. */
+LPD_API void LPD_CALL lpd_glicko2_default(lpd_rating* out);
+/*
+ * Applies one Glicko-2 rating period of `count` games to `player`. scores[i] is 1 for a win,
+ * 0 for a loss, 0.5 for a draw against an opponent rated opp_ratings[i] +/- opp_deviations[i].
+ */
+LPD_API int LPD_CALL lpd_glicko2_update(lpd_rating* player, const double* opp_ratings,
+                                        const double* opp_deviations, const double* scores, int count);
+
+/* ----------------------------------------------------------------- players */
+
+typedef struct lpd_player_info {
+    int32_t id;
+    int32_t games; /* rated puzzles */
+    int32_t wins;
+    int32_t reserved;
+    lpd_rating rating;
+    int64_t created_ms;
+    char name[64];
+} lpd_player_info;
+
+/* Opens (creating if needed) the player list. NULL path = in-memory only. */
+LPD_API lpd_players* LPD_CALL lpd_players_open(const char* path);
+LPD_API void LPD_CALL lpd_players_close(lpd_players* p);
+LPD_API int LPD_CALL lpd_players_count(const lpd_players* p);
+LPD_API int LPD_CALL lpd_players_get(const lpd_players* p, int index, lpd_player_info* out);
+LPD_API int LPD_CALL lpd_players_find(const lpd_players* p, int id, lpd_player_info* out);
+/* Returns the new player's id. LPD_ERR_ARG for an empty name, LPD_ERR_STATE for a duplicate. */
+LPD_API int LPD_CALL lpd_players_add(lpd_players* p, const char* name, int64_t created_ms);
+LPD_API int LPD_CALL lpd_players_rename(lpd_players* p, int id, const char* name);
+LPD_API int LPD_CALL lpd_players_remove(lpd_players* p, int id);
+/*
+ * Rates one puzzle attempt as a game between the player and the puzzle, saves, and returns the
+ * updated player in `out` (optional).
+ */
+LPD_API int LPD_CALL lpd_players_record(lpd_players* p, int id, double puzzle_rating, double puzzle_deviation,
+                                        int solved, lpd_player_info* out);
 
 #ifdef __cplusplus
 }

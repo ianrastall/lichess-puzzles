@@ -52,6 +52,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // The command does the work; this only dismisses whichever player flyout hosted the button.
+    private void OnPlayerFlyoutAction(object sender, RoutedEventArgs e)
+    {
+        NewPlayerFlyout.Hide();
+        RenamePlayerFlyout.Hide();
+        DeletePlayerFlyout.Hide();
+    }
+
     private void OnStepBack(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args) => Run(ViewModel.StepBackCommand, args);
     private void OnStepForward(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args) => Run(ViewModel.StepForwardCommand, args);
     private void OnStepFirst(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args) => Run(ViewModel.StepFirstCommand, args);

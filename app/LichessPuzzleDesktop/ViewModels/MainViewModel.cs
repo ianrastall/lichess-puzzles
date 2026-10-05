@@ -20,7 +20,8 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
     private readonly PuzzleDatabase _database = new();
     private readonly PuzzleSession _session = new();
     private readonly AnalysisEngine _engine = new();
-    private readonly PuzzleHistory _history;
+    private readonly PlayerStore _players;
+    private PuzzleHistory _history;
     private readonly PeriodicTimer _engineTimer = new(TimeSpan.FromMilliseconds(150));
 
     private PuzzleInfo? _puzzle;
@@ -31,14 +32,35 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
     private DateTimeOffset _startedAt;
     private string? _analysedFen;
     private bool _loadingSettings;
+    private bool _rated;            // the current puzzle counts towards the player's rating
+    private bool _ratingDecided;    // ...and its result has already been applied
+    private int _ratingAfter;       // rating after this puzzle, 0 while undecided or unrated
+    private string _ratingNote = "";
+
+    // Like Lichess: how far from the player's rating to aim, and how wide a band to draw from.
+    private static readonly int[] DifficultyOffsets = [-600, -300, 0, 300, 600];
+    private const int RatingSpread = 75;
 
     public MainViewModel(IShellService shell, AppSettings settings)
     {
         _shell = shell;
         _settings = settings;
-        _history = new PuzzleHistory(AppSettings.HistoryPath);
+        _players = new PlayerStore(AppSettings.PlayersPath);
+        if (_players.Count == 0)
+        {
+            // First run: one player named after the Windows account, inheriting any earlier history.
+            var first = _players.Add(Environment.UserName) ?? _players.Add("Player 1");
+            if (first is not null) AppSettings.AdoptLegacyHistory(first.Id);
+        }
+        foreach (var player in _players.All()) Players.Add(new PlayerOption(player));
+        var selected = Players.FirstOrDefault(p => p.Id == settings.PlayerId) ?? Players.FirstOrDefault();
+        _history = new PuzzleHistory(selected is null ? null : AppSettings.HistoryPathFor(selected.Id));
 
         _loadingSettings = true;
+        SelectedPlayer = selected;
+        IsRated = settings.Rated;
+        MatchRating = settings.MatchRating;
+        DifficultyIndex = Math.Clamp(settings.Difficulty, 0, DifficultyOffsets.Length - 1);
         RatingMin = settings.RatingMin;
         RatingMax = settings.RatingMax;
         PopularityMin = settings.PopularityMin;
@@ -51,6 +73,7 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
 
         Openings.Add(new OpeningOption(null, "Any opening"));
         SelectedOpening = Openings[0];
+        UpdatePlayerSummary();
         UpdateStats();
         _ = PollEngineAsync();
     }
@@ -60,6 +83,16 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
     public ObservableCollection<MoveRowViewModel> Moves { get; } = [];
     public ObservableCollection<ThemeOption> Themes { get; } = [];
     public ObservableCollection<OpeningOption> Openings { get; } = [];
+    public ObservableCollection<PlayerOption> Players { get; } = [];
+
+    [ObservableProperty] public partial PlayerOption? SelectedPlayer { get; set; }
+    [ObservableProperty] public partial string PlayerSummary { get; set; } = "";
+    [ObservableProperty] public partial string RatingChange { get; set; } = "";
+    [ObservableProperty] public partial string PlayerNameInput { get; set; } = "";
+    [ObservableProperty] public partial bool CanDeletePlayer { get; set; }
+    [ObservableProperty] public partial bool IsRated { get; set; }
+    [ObservableProperty] public partial bool MatchRating { get; set; }
+    [ObservableProperty] public partial int DifficultyIndex { get; set; }
 
     [ObservableProperty] public partial BoardSnapshot Board { get; set; } = BoardSnapshot.Empty;
 
@@ -221,7 +254,9 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
     private void NextPuzzle()
     {
         if (!HasDatabase || IsBusy) return;
-        int row = _database.RandomRow();
+        int row = MatchRating && SelectedPlayer is { } player
+            ? _database.RandomRowNear((int)Math.Round(player.Info.Rating) + DifficultyOffsets[DifficultyIndex], RatingSpread)
+            : _database.RandomRow();
         if (row < 0)
         {
             SetStatus(StatusKind.Warning, "No puzzles match", "Loosen the filters and apply them again.");
@@ -264,8 +299,16 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         _userFlipped = false;
         _startedAt = DateTimeOffset.Now;
 
+        // A puzzle is rated once: replaying one you have already seen never moves your rating.
+        bool alreadyPlayed = _history.Contains(_puzzle.Id);
+        _rated = IsRated && SelectedPlayer is not null && !alreadyPlayed;
+        _ratingDecided = false;
+        _ratingAfter = 0;
+        _ratingNote = "";
+
         PuzzleTitle = $"Puzzle #{_puzzle.Id}";
-        PuzzleFacts = $"Rating {_puzzle.Rating} ±{_puzzle.RatingDeviation}  ·  {_puzzle.NbPlays:N0} plays  ·  popularity {_puzzle.Popularity}";
+        PuzzleFacts = $"Rating {_puzzle.Rating} ±{_puzzle.RatingDeviation}  ·  {_puzzle.NbPlays:N0} plays  ·  popularity {_puzzle.Popularity}"
+            + (_rated ? "" : alreadyPlayed && IsRated ? "  ·  already played, not rated" : "  ·  not rated");
         PuzzleOpening = _puzzle.OpeningTags.Count > 0 ? ThemeNames.Humanize(_puzzle.OpeningTags[^1]) : "";
         HasGameUrl = IsLichessUrl(_puzzle.GameUrl);
         Refresh();
@@ -298,8 +341,9 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
     {
         int square = _session.Hint();
         if (square < 0) return;
+        bool decided = DecideRating(solved: false);
         Refresh(hintSquare: square);
-        SetStatus(StatusKind.Info, "Hint", "Move the highlighted piece.");
+        SetStatus(StatusKind.Info, "Hint", decided ? $"Move the highlighted piece. {_ratingNote}." : "Move the highlighted piece.");
     }
 
     [RelayCommand]
@@ -308,6 +352,7 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         if (!IsInProgress) return;
         _session.RevealAll();
         _puzzleSerial++;
+        DecideRating(solved: false);
         RecordAttempt();
         Refresh();
     }
@@ -344,8 +389,11 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         switch (_session.TryMove(from, to, promotion))
         {
             case MoveResult.Wrong:
+                // As on Lichess, the first mistake settles the rating; the puzzle can still be finished.
+                bool decided = DecideRating(solved: false);
                 Refresh();
-                SetStatus(StatusKind.Error, "Not the move", "That move doesn't work. Try something else.");
+                SetStatus(StatusKind.Error, "Not the move",
+                    decided ? $"That move doesn't work. {_ratingNote}. Try something else." : "That move doesn't work. Try something else.");
                 break;
             case MoveResult.Correct:
                 Refresh();
@@ -353,6 +401,7 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
                 _ = ShowReplyAsync(_puzzleSerial);
                 break;
             case MoveResult.Solved:
+                DecideRating(solved: true);
                 RecordAttempt();
                 Refresh();
                 break;
@@ -430,11 +479,11 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         if (state.Status == (int)PuzzleStatus.Solved)
         {
             if (state.SolutionShown != 0)
-                SetStatus(StatusKind.Warning, "Solution shown", "Step through the moves, then try the next puzzle.");
+                SetStatus(StatusKind.Warning, "Solution shown", WithRating("Step through the moves, then try the next puzzle."));
             else if (state.Mistakes > 0 || state.Hints > 0)
-                SetStatus(StatusKind.Warning, "Puzzle complete", Describe(state.Mistakes, state.Hints));
+                SetStatus(StatusKind.Warning, "Puzzle complete", WithRating(Describe(state.Mistakes, state.Hints)));
             else
-                SetStatus(StatusKind.Success, "Solved!", "Clean solve — on to the next one.");
+                SetStatus(StatusKind.Success, "Solved!", WithRating("Clean solve."));
         }
         else if (state.CanMove != 0)
         {
@@ -454,6 +503,8 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         }
     }
 
+    private string WithRating(string text) => _ratingNote.Length == 0 ? text : $"{text} {_ratingNote}.";
+
     private void SetStatus(StatusKind kind, string title, string text)
     {
         StatusKind = kind;
@@ -470,7 +521,7 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         SessionState state = _session.State;
         bool clean = state.Status == (int)PuzzleStatus.Solved && state.Mistakes == 0 && state.Hints == 0 && state.SolutionShown == 0;
         int seconds = (int)Math.Clamp((DateTimeOffset.Now - _startedAt).TotalSeconds, 0, 86400);
-        _history.Add(new HistoryEntry(_puzzle.Id, DateTimeOffset.Now, _puzzle.Rating, clean, state.Mistakes, state.Hints, seconds));
+        _history.Add(new HistoryEntry(_puzzle.Id, DateTimeOffset.Now, _puzzle.Rating, clean, state.Mistakes, state.Hints, seconds, _ratingAfter));
         UpdateStats();
     }
 
@@ -501,6 +552,116 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
     {
         _history.Clear();
         UpdateStats();
+    }
+
+    // --------------------------------------------------------------- players
+
+    /// <summary>
+    /// Applies the result of the current puzzle to the player's Glicko-2 rating, once.
+    /// Returns true when this call was the one that settled it.
+    /// </summary>
+    private bool DecideRating(bool solved)
+    {
+        if (!_rated || _ratingDecided || _puzzle is null || SelectedPlayer is not { } player) return false;
+        _ratingDecided = true;
+
+        int before = (int)Math.Round(player.Info.Rating);
+        if (_players.Record(player.Id, _puzzle, solved) is not { } updated) return false;
+        player.Update(updated);
+        _ratingAfter = (int)Math.Round(updated.Rating);
+        int change = _ratingAfter - before;
+        RatingChange = change.ToString("+0;−0;±0", CultureInfo.InvariantCulture);
+        _ratingNote = $"Rating {_ratingAfter} ({RatingChange})";
+        UpdatePlayerSummary();
+        return true;
+    }
+
+    private void UpdatePlayerSummary()
+    {
+        CanDeletePlayer = Players.Count > 1;
+        if (SelectedPlayer is not { } player)
+        {
+            PlayerSummary = "";
+            return;
+        }
+        PlayerInfo info = player.Info;
+        string record = info.Games == 0
+            ? "no rated puzzles yet"
+            : $"{info.Games:N0} rated, {100.0 * info.Wins / info.Games:0}% solved";
+        PlayerSummary = $"{player.RatingText} ±{info.Deviation:0}  ·  {record}";
+    }
+
+    partial void OnSelectedPlayerChanged(PlayerOption? oldValue, PlayerOption? newValue)
+    {
+        if (_loadingSettings || newValue is null || ReferenceEquals(oldValue, newValue)) return;
+
+        // Close the previous player's attempt against their own history before switching files.
+        RecordAttemptIfAbandoned();
+        _recorded = true;
+        _rated = false;
+        _history.Dispose();
+        _history = new PuzzleHistory(AppSettings.HistoryPathFor(newValue.Id));
+        RatingChange = "";
+        UpdatePlayerSummary();
+        UpdateStats();
+        SaveSettings();
+        if (HasDatabase) _ = ApplyFilterAsync(); // "skip played" differs per player; also deals a fresh puzzle
+    }
+
+    [RelayCommand]
+    private async Task AddPlayerAsync()
+    {
+        if (_players.Add(PlayerNameInput) is not { } added)
+        {
+            await _shell.ShowMessageAsync("Player not added", "Enter a name that is not already in use.");
+            return;
+        }
+        PlayerNameInput = "";
+        var option = new PlayerOption(added);
+        Players.Add(option);
+        SelectedPlayer = option;
+    }
+
+    [RelayCommand]
+    private async Task RenamePlayerAsync()
+    {
+        if (SelectedPlayer is not { } player) return;
+        if (_players.Rename(player.Id, PlayerNameInput) is not { } renamed)
+        {
+            await _shell.ShowMessageAsync("Player not renamed", "Enter a name that is not already in use.");
+            return;
+        }
+        PlayerNameInput = "";
+        player.Update(renamed);
+    }
+
+    [RelayCommand]
+    private void DeletePlayer()
+    {
+        if (SelectedPlayer is not { } player || Players.Count <= 1) return;
+        int index = Players.IndexOf(player);
+        if (!_players.Remove(player.Id)) return;
+
+        // Select a neighbour first so the history file being deleted is no longer open.
+        SelectedPlayer = Players[index == 0 ? 1 : index - 1];
+        Players.Remove(player);
+        AppSettings.DeleteHistory(player.Id);
+        UpdatePlayerSummary();
+    }
+
+    partial void OnIsRatedChanged(bool value)
+    {
+        if (!_loadingSettings) SaveSettings();
+    }
+
+    partial void OnMatchRatingChanged(bool value)
+    {
+        if (!_loadingSettings) SaveSettings();
+    }
+
+    partial void OnDifficultyIndexChanged(int value)
+    {
+        if (!_loadingSettings) SaveSettings();
     }
 
     // ---------------------------------------------------------------- engine
@@ -715,6 +876,10 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         _settings.EngineEnabled = IsEngineEnabled;
         _settings.EvalWhileSolving = EvalWhileSolving;
         _settings.PgnFromPlayerMove = PgnFromPlayerMove;
+        _settings.PlayerId = SelectedPlayer?.Id ?? 0;
+        _settings.Rated = IsRated;
+        _settings.MatchRating = MatchRating;
+        _settings.Difficulty = Math.Clamp(DifficultyIndex, 0, DifficultyOffsets.Length - 1);
         _settings.Save();
     }
 
@@ -729,5 +894,6 @@ public sealed partial class MainViewModel : ObservableObject, IBoardInteraction,
         _session.Dispose();
         _database.Dispose();
         _history.Dispose();
+        _players.Dispose();
     }
 }

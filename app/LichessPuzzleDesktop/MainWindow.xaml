@@ -70,6 +70,76 @@
                 <StackPanel Spacing="12">
                     <Border Style="{StaticResource Card}">
                         <StackPanel Spacing="8">
+                            <Grid>
+                                <TextBlock Text="Player" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                <TextBlock Text="{x:Bind ViewModel.RatingChange, Mode=OneWay}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           FontWeight="SemiBold" ToolTipService.ToolTip="Rating change from the last rated puzzle" />
+                            </Grid>
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.Players}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedPlayer, Mode=TwoWay}"
+                                      IsEnabled="{x:Bind local:Ui.Not(ViewModel.IsBusy), Mode=OneWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PlayerOption">
+                                        <TextBlock Text="{x:Bind Label, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="{x:Bind ViewModel.PlayerSummary, Mode=OneWay}" Style="{StaticResource Secondary}" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="New…">
+                                    <Button.Flyout>
+                                        <Flyout x:Name="NewPlayerFlyout">
+                                            <StackPanel Spacing="12" Width="240">
+                                                <TextBox Header="New player" PlaceholderText="Name" MaxLength="40"
+                                                         Text="{x:Bind ViewModel.PlayerNameInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                <Button Content="Add player" Style="{StaticResource AccentButtonStyle}"
+                                                        Command="{x:Bind ViewModel.AddPlayerCommand}" Click="OnPlayerFlyoutAction" />
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                                <Button Content="Rename…">
+                                    <Button.Flyout>
+                                        <Flyout x:Name="RenamePlayerFlyout">
+                                            <StackPanel Spacing="12" Width="240">
+                                                <TextBox Header="Rename player" PlaceholderText="New name" MaxLength="40"
+                                                         Text="{x:Bind ViewModel.PlayerNameInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                <Button Content="Rename" Style="{StaticResource AccentButtonStyle}"
+                                                        Command="{x:Bind ViewModel.RenamePlayerCommand}" Click="OnPlayerFlyoutAction" />
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                                <Button Content="Delete…" IsEnabled="{x:Bind ViewModel.CanDeletePlayer, Mode=OneWay}">
+                                    <Button.Flyout>
+                                        <Flyout x:Name="DeletePlayerFlyout">
+                                            <StackPanel Spacing="12" MaxWidth="240">
+                                                <TextBlock TextWrapping="Wrap" Text="Delete this player, with their rating and history? This cannot be undone." />
+                                                <Button Content="Delete player" Command="{x:Bind ViewModel.DeletePlayerCommand}" Click="OnPlayerFlyoutAction" />
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                            </StackPanel>
+
+                            <CheckBox Content="Rated" IsChecked="{x:Bind ViewModel.IsRated, Mode=TwoWay}"
+                                      ToolTipService.ToolTip="Each new puzzle counts as a Glicko-2 rated game against the puzzle. The first mistake or hint counts as a loss." />
+                            <CheckBox Content="Match puzzles to my rating" IsChecked="{x:Bind ViewModel.MatchRating, Mode=TwoWay}" />
+                            <ComboBox Header="Difficulty" HorizontalAlignment="Stretch"
+                                      SelectedIndex="{x:Bind ViewModel.DifficultyIndex, Mode=TwoWay}"
+                                      IsEnabled="{x:Bind ViewModel.MatchRating, Mode=OneWay}">
+                                <x:String>Easiest (−600)</x:String>
+                                <x:String>Easier (−300)</x:String>
+                                <x:String>Normal</x:String>
+                                <x:String>Harder (+300)</x:String>
+                                <x:String>Hardest (+600)</x:String>
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="8">
                             <TextBlock Text="Database" Style="{StaticResource CardTitle}" />
                             <TextBlock Text="{x:Bind ViewModel.DatabaseName, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{x:Bind ViewModel.DatabaseSummary, Mode=OneWay}" Style="{StaticResource Secondary}"

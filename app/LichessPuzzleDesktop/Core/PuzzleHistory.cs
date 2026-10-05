@@ -20,6 +20,7 @@ public sealed unsafe class PuzzleHistory(string? path) : IDisposable
         raw.Mistakes = entry.Mistakes;
         raw.Hints = entry.Hints;
         raw.Seconds = entry.Seconds;
+        raw.PlayerRating = entry.PlayerRating;
         Native.lpd_history_add(_handle, &raw);
     }
 
@@ -30,10 +31,12 @@ public sealed unsafe class PuzzleHistory(string? path) : IDisposable
         for (int i = 0; Native.lpd_history_get(_handle, i, &raw) == Native.Ok; i++)
         {
             list.Add(new HistoryEntry(Native.Text(raw.Id, 16), DateTimeOffset.FromUnixTimeMilliseconds(raw.TimestampMs),
-                raw.Rating, raw.Solved != 0, raw.Mistakes, raw.Hints, raw.Seconds));
+                raw.Rating, raw.Solved != 0, raw.Mistakes, raw.Hints, raw.Seconds, raw.PlayerRating));
         }
         return list;
     }
+
+    public bool Contains(string id) => Native.lpd_history_contains(_handle, id) != 0;
 
     public void Clear() => Native.lpd_history_clear(_handle);
 

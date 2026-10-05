@@ -73,6 +73,13 @@ public sealed class PuzzleDatabase : IDisposable
         return row < 0 ? -1 : row;
     }
 
+    /// <summary>A random filtered row rated within <paramref name="spread"/> of the target (nearest if none), or -1.</summary>
+    public int RandomRowNear(int targetRating, int spread)
+    {
+        int row = Native.lpd_db_random_row_near(_handle, targetRating, spread);
+        return row < 0 ? -1 : row;
+    }
+
     /// <summary>Writes puzzles as PGN. <paramref name="rows"/> null = the filtered set. Returns the number written.</summary>
     public async Task<int> ExportPgnAsync(string path, int[]? rows, bool fromPlayerMove, IProgress<double>? progress, CancellationToken cancel)
     {

@@ -1,6 +1,7 @@
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LichessPuzzleDesktop.Core;
 
 namespace LichessPuzzleDesktop.ViewModels;
 
@@ -44,6 +45,35 @@ public sealed partial class ThemeOption(string key, int count, Action changed) :
     public partial bool IsSelected { get; set; }
 
     partial void OnIsSelectedChanged(bool value) => changed();
+}
+
+/// <summary>A player as shown in the player picker; updated in place when the rating changes.</summary>
+public sealed partial class PlayerOption : ObservableObject
+{
+    // Lichess marks a rating as provisional above this deviation.
+    private const double ProvisionalDeviation = 110;
+
+    public PlayerOption(PlayerInfo info)
+    {
+        Id = info.Id;
+        Info = info;
+        Label = "";
+        Update(info);
+    }
+
+    public int Id { get; }
+    public PlayerInfo Info { get; private set; }
+
+    [ObservableProperty]
+    public partial string Label { get; set; }
+
+    public string RatingText => Info.Rating.ToString("0") + (Info.Deviation > ProvisionalDeviation ? "?" : "");
+
+    public void Update(PlayerInfo info)
+    {
+        Info = info;
+        Label = $"{info.Name}  ·  {RatingText}";
+    }
 }
 
 public sealed record OpeningOption(string? Key, string Label)

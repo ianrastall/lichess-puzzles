@@ -43,7 +43,12 @@ public sealed record PlyInfo(int Index, string San, string Uci, int From, int To
 public sealed record EngineInfo(bool Running, int Depth, int ScoreCp, int Mate, long Nodes, int TimeMs, int Generation,
     string BestUci, string Pv);
 
-public sealed record HistoryEntry(string Id, DateTimeOffset Time, int Rating, bool Solved, int Mistakes, int Hints, int Seconds);
+/// <param name="PlayerRating">The player's rating after the attempt, 0 when it was not rated.</param>
+public sealed record HistoryEntry(string Id, DateTimeOffset Time, int Rating, bool Solved, int Mistakes, int Hints, int Seconds,
+    int PlayerRating);
+
+/// <summary>A player and their Glicko-2 puzzle rating.</summary>
+public sealed record PlayerInfo(int Id, string Name, double Rating, double Deviation, double Volatility, int Games, int Wins);
 
 public sealed record NamedCount(string Name, int Count);
 

@@ -13,6 +13,7 @@ A dark-mode Windows desktop app for playing puzzles from the
 - Move notation (SAN) with click and arrow-key navigation
 - Hint, show solution, retry, next puzzle; any checkmating move is accepted as a solution
 - Filters: rating range, minimum popularity and plays, themes, opening, skip already-played puzzles
+- Players with Glicko-2 puzzle ratings, and puzzles dealt to match the current player's rating
 - Jump to a puzzle by id
 - Evaluation bar and principal variation from a built-in engine (hidden while solving by default)
 - History of played puzzles with a clean-solve count and streak
@@ -85,6 +86,25 @@ The app starts with a 13-puzzle sample (`samples/sample_puzzles.csv`). For the f
 The file is memory-mapped and indexed in memory at roughly 33 bytes per puzzle; the last
 database you opened is reloaded on the next start.
 
+## Players and ratings
+
+Each player has a [Glicko-2](https://www.glicko.net/glicko/glicko2.pdf) rating, starting at
+1500 with a deviation of 350, plus their own history. The first run creates one player named
+after your Windows account; add, rename or delete players from the **Player** card.
+
+- With **Rated** on, every puzzle you have not played before is a rated game between you and
+  the puzzle, using the puzzle's rating and rating deviation from the database.
+- As on Lichess, the result is settled early: the first wrong move, a hint or showing the
+  solution is a loss; solving without any of those is a win. You can still finish the puzzle.
+- Puzzles you have already played, and puzzles played with **Rated** off, never change the rating.
+- A `?` after a rating means it is still provisional (deviation above 110). New ratings move a
+  lot — a first loss can cost over 150 points — and settle as the deviation shrinks.
+- With **Match puzzles to my rating** on, the next puzzle is drawn from those within 75 points
+  of your rating plus the **Difficulty** offset (−600 to +600), or the nearest ones if none are
+  that close. The filters still apply.
+
+The deviation does not grow while a player is away, unlike full Glicko-2 rating periods.
+
 ## Keyboard
 
 | Key | Action |
@@ -106,6 +126,7 @@ core/
   src/puzzle.*          CSV row parsing and PGN generation
   src/engine.cpp        alpha-beta search used for the evaluation
   src/history.*         log of played puzzles
+  src/players.cpp       Glicko-2 and the player list
   tests/core_tests.cpp  self-checks
 app/LichessPuzzleDesktop/
   Interop/              P/Invoke declarations mirroring lpd_core.h

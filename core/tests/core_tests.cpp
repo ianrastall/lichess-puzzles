@@ -265,6 +265,113 @@ static void test_engine() {
     lpd_engine_destroy(engine);
 }
 
+static bool near(double a, double b, double tolerance) { return a > b - tolerance && a < b + tolerance; }
+
+static void test_ratings(const char* csv) {
+    // The worked example from Glickman's Glicko-2 paper.
+    lpd_rating r{1500, 200, 0.06};
+    const double opp[] = {1400, 1550, 1700}, dev[] = {30, 100, 300}, score[] = {1, 0, 0};
+    CHECK_EQ(lpd_glicko2_update(&r, opp, dev, score, 3), LPD_OK);
+    CHECK(near(r.rating, 1464.06, 0.01));
+    CHECK(near(r.deviation, 151.52, 0.01));
+    CHECK(near(r.volatility, 0.05999, 0.00001));
+
+    std::string path = std::string(csv) + ".test-players";
+    std::remove(path.c_str());
+    lpd_players* players = lpd_players_open(path.c_str());
+    CHECK_EQ(lpd_players_count(players), 0);
+    int ann = lpd_players_add(players, "  Ann, the first ", 1000);
+    int bob = lpd_players_add(players, "Bob", 2000);
+    CHECK_EQ(ann, 1);
+    CHECK_EQ(bob, 2);
+    CHECK_EQ(lpd_players_add(players, "Bob", 0), LPD_ERR_STATE);
+    CHECK_EQ(lpd_players_add(players, "   ", 0), LPD_ERR_ARG);
+    CHECK_EQ(lpd_players_rename(players, bob, "Ann  the first"), LPD_ERR_STATE);
+    CHECK_EQ(lpd_players_rename(players, bob, "Robert"), LPD_OK);
+
+    lpd_player_info info;
+    CHECK_EQ(lpd_players_find(players, ann, &info), LPD_OK);
+    CHECK_EQ(std::string(info.name), std::string("Ann  the first"));
+    CHECK_EQ(info.rating.rating, 1500.0);
+    CHECK_EQ(info.rating.deviation, 350.0);
+
+    // A win against an equally rated puzzle raises the rating and shrinks the deviation; a loss lowers it.
+    CHECK_EQ(lpd_players_record(players, ann, 1500, 80, 1, &info), LPD_OK);
+    CHECK(info.rating.rating > 1600 && info.rating.rating < 1700);
+    CHECK(info.rating.deviation < 350);
+    double after_win = info.rating.rating;
+    CHECK_EQ(lpd_players_record(players, ann, 1500, 80, 0, &info), LPD_OK);
+    CHECK(info.rating.rating < after_win);
+    CHECK_EQ(info.games, 2);
+    CHECK_EQ(info.wins, 1);
+    for (int i = 0; i < 400; ++i) lpd_players_record(players, bob, 1500, 80, i % 2, &info);
+    CHECK(info.rating.deviation >= 45.0);
+    CHECK(near(info.rating.rating, 1500, 120));
+    CHECK_EQ(lpd_players_record(players, 99, 1500, 80, 1, nullptr), LPD_ERR_NOT_FOUND);
+    lpd_players_close(players);
+
+    // Everything survives a reload; removing a player sticks.
+    players = lpd_players_open(path.c_str());
+    CHECK_EQ(lpd_players_count(players), 2);
+    CHECK_EQ(lpd_players_find(players, ann, &info), LPD_OK);
+    CHECK_EQ(info.games, 2);
+    CHECK_EQ(info.created_ms, 1000);
+    CHECK(info.rating.rating < after_win && info.rating.rating > 1400);
+    CHECK_EQ(lpd_players_get(players, 1, &info), LPD_OK);
+    CHECK_EQ(std::string(info.name), std::string("Robert"));
+    CHECK_EQ(lpd_players_remove(players, ann), LPD_OK);
+    CHECK_EQ(lpd_players_add(players, "Cy", 0), 3);
+    lpd_players_close(players);
+    players = lpd_players_open(path.c_str());
+    CHECK_EQ(lpd_players_count(players), 2);
+    CHECK_EQ(lpd_players_find(players, ann, &info), LPD_ERR_NOT_FOUND);
+    lpd_players_close(players);
+    std::remove(path.c_str());
+
+    // Rating-matched selection: stays inside the window, and widens when the window is empty.
+    lpd_db* db = lpd_db_create();
+    CHECK_EQ(lpd_db_load(db, csv), LPD_OK);
+    lpd_puzzle_info puzzle;
+    for (int i = 0; i < 50; ++i) {
+        int row = lpd_db_random_row_near(db, 1540, 40);
+        CHECK(row >= 0);
+        lpd_db_get(db, row, &puzzle);
+        CHECK(puzzle.rating >= 1500 && puzzle.rating <= 1580);
+    }
+    lpd_db_get(db, lpd_db_random_row_near(db, 3400, 50), &puzzle);
+    CHECK_EQ(puzzle.rating, 2873);
+    lpd_db_get(db, lpd_db_random_row_near(db, 300, 50), &puzzle);
+    CHECK_EQ(puzzle.rating, 998);
+    lpd_db_filter(db, 0, 4000, -100, 0, "mateIn1", nullptr, nullptr);
+    lpd_db_get(db, lpd_db_random_row_near(db, 2900, 100), &puzzle);
+    CHECK_EQ(std::string(puzzle.id), std::string("0000H"));
+    lpd_db_destroy(db);
+
+    // The history remembers the player's rating, and still reads rows written without it.
+    std::string hpath = std::string(csv) + ".test-history";
+    std::remove(hpath.c_str());
+    lpd_history* history = lpd_history_open(hpath.c_str());
+    lpd_history_entry entry{};
+    std::strcpy(entry.id, "00008");
+    entry.solved = 1;
+    entry.player_rating = 1623;
+    CHECK_EQ(lpd_history_add(history, &entry), LPD_OK);
+    lpd_history_close(history);
+    if (FILE* f = std::fopen(hpath.c_str(), "ab")) {
+        std::fputs("0000D,5,1529,0,2,1,30\n", f);
+        std::fclose(f);
+    }
+    history = lpd_history_open(hpath.c_str());
+    CHECK_EQ(lpd_history_count(history), 2);
+    lpd_history_get(history, 0, &entry);
+    CHECK_EQ(entry.player_rating, 1623);
+    lpd_history_get(history, 1, &entry);
+    CHECK_EQ(entry.player_rating, 0);
+    CHECK_EQ(entry.mistakes, 2);
+    lpd_history_close(history);
+    std::remove(hpath.c_str());
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::puts("usage: lpd_core_tests <sample_puzzles.csv>");
@@ -275,6 +382,7 @@ int main(int argc, char** argv) {
     test_san();
     test_database(argv[1]);
     test_engine();
+    test_ratings(argv[1]);
     std::printf(g_failures ? "%d check(s) FAILED\n" : "all checks passed\n", g_failures);
     return g_failures ? 1 : 0;
 }

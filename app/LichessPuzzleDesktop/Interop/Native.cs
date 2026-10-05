@@ -75,16 +75,37 @@ internal unsafe struct LpdHistoryEntry
     public int Mistakes;
     public int Hints;
     public int Seconds;
+    public int PlayerRating;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct LpdRating
+{
+    public double Rating;
+    public double Deviation;
+    public double Volatility;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct LpdPlayerInfo
+{
+    public int Id;
+    public int Games;
+    public int Wins;
     public int Reserved;
+    public LpdRating Rating;
+    public long CreatedMs;
+    public fixed byte Name[64];
 }
 
 internal static unsafe partial class Native
 {
     private const string Dll = "lpd_core";
 
-    public const int AbiVersion = 1;
+    public const int AbiVersion = 2;
 
     public const int Ok = 0;
+    public const int ErrIo = -2;
     public const int ErrCancelled = -4;
     public const int ErrNotFound = -5;
 
@@ -112,6 +133,7 @@ internal static unsafe partial class Native
         string? themes, string? opening, nint excludePlayed);
     [LibraryImport(Dll)] public static partial int lpd_db_filtered_count(nint db);
     [LibraryImport(Dll)] public static partial int lpd_db_random_row(nint db);
+    [LibraryImport(Dll)] public static partial int lpd_db_random_row_near(nint db, int targetRating, int spread);
 
     // Export
     [LibraryImport(Dll)] public static partial int lpd_puzzle_pgn(LpdPuzzleInfo* puzzle, int flags, byte* buf, int cap);
@@ -152,7 +174,19 @@ internal static unsafe partial class Native
     [LibraryImport(Dll)] public static partial int lpd_history_add(nint history, LpdHistoryEntry* entry);
     [LibraryImport(Dll)] public static partial int lpd_history_count(nint history);
     [LibraryImport(Dll)] public static partial int lpd_history_get(nint history, int index, LpdHistoryEntry* entry);
+    [LibraryImport(Dll, StringMarshalling = StringMarshalling.Utf8)] public static partial int lpd_history_contains(nint history, string id);
     [LibraryImport(Dll)] public static partial int lpd_history_clear(nint history);
+
+    // Players and ratings
+    [LibraryImport(Dll, StringMarshalling = StringMarshalling.Utf8)] public static partial nint lpd_players_open(string? path);
+    [LibraryImport(Dll)] public static partial void lpd_players_close(nint players);
+    [LibraryImport(Dll)] public static partial int lpd_players_count(nint players);
+    [LibraryImport(Dll)] public static partial int lpd_players_get(nint players, int index, LpdPlayerInfo* info);
+    [LibraryImport(Dll, StringMarshalling = StringMarshalling.Utf8)] public static partial int lpd_players_add(nint players, string name, long createdMs);
+    [LibraryImport(Dll, StringMarshalling = StringMarshalling.Utf8)] public static partial int lpd_players_rename(nint players, int id, string name);
+    [LibraryImport(Dll)] public static partial int lpd_players_remove(nint players, int id);
+    [LibraryImport(Dll)]
+    public static partial int lpd_players_record(nint players, int id, double puzzleRating, double puzzleDeviation, int solved, LpdPlayerInfo* info);
 
     /// <summary>Reads a NUL-terminated UTF-8 field of at most <paramref name="capacity"/> bytes.</summary>
     public static string Text(byte* field, int capacity)

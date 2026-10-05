@@ -13,6 +13,7 @@ add_library(lpd_core_objects OBJECT
     src/db.cpp
     src/engine.cpp
     src/history.cpp
+    src/players.cpp
     src/puzzle.cpp
     src/session.cpp)
 target_compile_definitions(lpd_core_objects PRIVATE LPD_CORE_BUILD _CRT_SECURE_NO_WARNINGS)

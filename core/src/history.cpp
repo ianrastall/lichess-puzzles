@@ -10,8 +10,8 @@ const char kHeader[] = "PuzzleId,Timestamp,Rating,Solved,Mistakes,Hints,Seconds\
 
 std::string format_entry(const lpd_history_entry& e) {
     char line[160];
-    std::snprintf(line, sizeof line, "%s,%lld,%d,%d,%d,%d,%d\n", e.id, static_cast<long long>(e.timestamp_ms),
-                  e.rating, e.solved, e.mistakes, e.hints, e.seconds);
+    std::snprintf(line, sizeof line, "%s,%lld,%d,%d,%d,%d,%d,%d\n", e.id, static_cast<long long>(e.timestamp_ms),
+                  e.rating, e.solved, e.mistakes, e.hints, e.seconds, e.player_rating);
     return line;
 }
 
@@ -32,6 +32,7 @@ bool parse_entry(std::string_view line, lpd_history_entry& e) {
     e.mistakes = static_cast<int32_t>(num(f[4]));
     e.hints = static_cast<int32_t>(num(f[5]));
     e.seconds = static_cast<int32_t>(num(f[6]));
+    if (f.size() > 7) e.player_rating = static_cast<int32_t>(num(f[7])); // absent in files written before ratings
     return true;
 }
 

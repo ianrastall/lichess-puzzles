@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <atomic>
 #include <charconv>
+#include <climits>
+#include <cstdlib>
 #include <cstdio>
 #include <random>
 #include <unordered_map>
@@ -386,6 +388,30 @@ LPD_API int LPD_CALL lpd_db_random_row(lpd_db* db) {
     if (db->filtered.empty()) return LPD_ERR_NOT_FOUND;
     std::uniform_int_distribution<size_t> pick(0, db->filtered.size() - 1);
     return static_cast<int>(db->filtered[pick(db->rng)]);
+}
+
+LPD_API int LPD_CALL lpd_db_random_row_near(lpd_db* db, int target_rating, int spread) {
+    if (!db) return LPD_ERR_ARG;
+    if (db->filtered.empty()) return LPD_ERR_NOT_FOUND;
+    if (spread < 0) spread = 0;
+    int window = spread;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        // One pass of reservoir sampling picks uniformly among the puzzles inside the window,
+        // and notes how far away the closest puzzle is in case the window turns out to be empty.
+        const int lo = target_rating - window, hi = target_rating + window;
+        uint64_t seen = 0;
+        uint32_t chosen = 0;
+        int nearest = INT_MAX;
+        for (uint32_t row : db->filtered) {
+            int r = db->rating[row];
+            nearest = std::min(nearest, std::abs(r - target_rating));
+            if (r < lo || r > hi) continue;
+            if (std::uniform_int_distribution<uint64_t>(0, seen++)(db->rng) == 0) chosen = row;
+        }
+        if (seen) return static_cast<int>(chosen);
+        window = nearest + spread;
+    }
+    return lpd_db_random_row(db);
 }
 
 LPD_API int LPD_CALL lpd_puzzle_pgn(const lpd_puzzle_info* puzzle, int flags, char* buf, int cap) {

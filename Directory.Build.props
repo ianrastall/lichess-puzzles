@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>0.1.0</Version>
+    <Authors>Ian Rastall</Authors>
+    <Product>Jupiter · Lichess Puzzles</Product>
+    <Platforms>x64</Platforms>
+    <!-- An unspecified platform (the SDK default AnyCPU) means x64; any other platform is rejected below. -->
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</RestoreLockedMode>
+    <RepoRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)'))</RepoRoot>
+  </PropertyGroup>
+
+  <Target Name="RejectUnsupportedPlatform" BeforeTargets="Restore;Build" Condition="'$(Platform)' != 'x64' or '$(RuntimeIdentifier)' != 'win-x64'">
+    <Error Text="Lichess Puzzles builds only for Platform x64 and RuntimeIdentifier win-x64 (got $(Platform) / $(RuntimeIdentifier))." />
+  </Target>
+</Project>

@@ -1,0 +1,19 @@
+<Project>
+  <!-- Builds the Rust C ABI facade with Cargo and ships the DLL beside the managed assemblies. -->
+  <PropertyGroup>
+    <CargoProfileDir Condition="'$(Configuration)' == 'Release'">release</CargoProfileDir>
+    <CargoProfileDir Condition="'$(Configuration)' != 'Release'">debug</CargoProfileDir>
+    <CargoProfileFlag Condition="'$(Configuration)' == 'Release'">--release</CargoProfileFlag>
+    <CargoTargetDir>$(RepoRoot)target</CargoTargetDir>
+    <NativeCoreDll>$(CargoTargetDir)\x86_64-pc-windows-msvc\$(CargoProfileDir)\lichess_puzzles_ffi.dll</NativeCoreDll>
+  </PropertyGroup>
+
+  <Target Name="BuildNativeCore" BeforeTargets="AssignTargetPaths" Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipNativeBuild)' != 'true'">
+    <Exec Command="cargo build -p lichess_puzzles_ffi --locked --target x86_64-pc-windows-msvc --target-dir &quot;$(CargoTargetDir)&quot; $(CargoProfileFlag)" WorkingDirectory="$(RepoRoot)" />
+  </Target>
+
+  <ItemGroup>
+    <None Include="$(NativeCoreDll)" Link="lichess_puzzles_ffi.dll" Visible="false"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,21 @@
+[package]
+name = "lichess_puzzles_ffi"
+description = "C ABI facade over the Lichess Puzzles core for the WinUI shell."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+lichess_puzzles_core.workspace = true
+prost.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+protox.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

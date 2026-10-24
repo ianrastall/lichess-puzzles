@@ -1,0 +1,309 @@
+// Messages exchanged over the Lichess Puzzles C ABI (core/ffi). Schema evolution follows protobuf
+// rules: never reuse a field number; reserve removed fields and names. Unknown enum values are
+// treated as the zero value. Every Request carries a request_id that its Response echoes.
+
+syntax = "proto3";
+
+package jupiter.lichess_puzzles.v1;
+
+option csharp_namespace = "Jupiter.LichessPuzzles.Messages";
+
+message CreateConfig {
+  string data_dir = 1;
+  // Empty means the Lichess puzzle database URL.
+  string source_url = 2;
+}
+
+message Request {
+  uint64 request_id = 1;
+  oneof command {
+    GetStatus get_status = 10;
+    GetCatalogue get_catalogue = 11;
+    SetFilter set_filter = 12;
+    NextPuzzle next_puzzle = 13;
+    LoadPuzzle load_puzzle = 14;
+    SessionCommand session = 15;
+    StartDownload start_download = 20;
+    StartBuild start_build = 21;
+    CheckForUpdate check_for_update = 22;
+    PauseDownload pause_download = 23;
+    CancelOperation cancel_operation = 24;
+    SwitchStore switch_store = 25;
+  }
+}
+
+message GetStatus {}
+message GetCatalogue {}
+message SetFilter {
+  Filter filter = 1;
+}
+// Starts a random puzzle matching the current filter.
+message NextPuzzle {}
+message LoadPuzzle {
+  // Puzzle id or lichess.org training link.
+  string id = 1;
+  bool replay = 2;
+}
+message SessionCommand {
+  oneof command {
+    Empty get = 1;
+    Empty play_opponent = 2;
+    // UCI, such as e2e4, e1g1 or e7e8q.
+    string make_move = 3;
+    Empty hint = 4;
+    Empty show_solution = 5;
+    Empty retry = 6;
+    uint32 navigate = 7;
+  }
+}
+message Empty {}
+// Downloads the database (resuming a paused download) and builds a store from it.
+message StartDownload {
+  bool keep_download = 1;
+}
+// Builds a store from a .csv or .csv.zst file, or from the kept download when input is empty.
+message StartBuild {
+  string input = 1;
+  bool keep_download = 2;
+}
+message CheckForUpdate {}
+message PauseDownload {}
+message CancelOperation {}
+message SwitchStore {}
+
+message Response {
+  uint64 request_id = 1;
+  oneof result {
+    Status status = 10;
+    Catalogue catalogue = 11;
+    Counts counts = 12;
+    SessionResult session = 13;
+    Done done = 14;
+    Error error = 15;
+  }
+}
+
+message Done {}
+
+enum ErrorKind {
+  ERROR_KIND_UNSPECIFIED = 0;
+  ERROR_KIND_NO_STORE = 1;
+  ERROR_KIND_BUSY = 2;
+  ERROR_KIND_NOT_FOUND = 3;
+  ERROR_KIND_NO_MATCHES = 4;
+  ERROR_KIND_INVALID_FILTER = 5;
+  ERROR_KIND_STATE = 6;
+  ERROR_KIND_IO = 7;
+  ERROR_KIND_UNKNOWN_COMMAND = 8;
+}
+
+message Error {
+  ErrorKind kind = 1;
+  string message = 2;
+}
+
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_WHITE = 1;
+  SIDE_BLACK = 2;
+}
+
+message Filter {
+  // Zero means no bound for every optional number below.
+  uint32 rating_min = 1;
+  uint32 rating_max = 2;
+  uint32 max_deviation = 3;
+  bool has_min_popularity = 4;
+  sint32 min_popularity = 5;
+  uint32 min_plays = 6;
+  repeated string themes_any = 7;
+  repeated string themes_all = 8;
+  repeated string themes_none = 9;
+  // Opening family or variation tags.
+  repeated string openings = 10;
+  Side solver = 11;
+  uint32 min_solution_moves = 12;
+  uint32 max_solution_moves = 13;
+}
+
+message Counts {
+  uint64 total = 1;
+  // By theme bit.
+  repeated uint64 themes = 2;
+  // By family id; index 0 counts puzzles without an opening.
+  repeated uint64 families = 3;
+  // By variation id; index 0 counts puzzles without a variation.
+  repeated uint64 variations = 4;
+}
+
+message RemoteVersion {
+  string etag = 1;
+  string last_modified = 2;
+  uint64 length = 3;
+}
+
+message StoreSummary {
+  string path = 1;
+  uint64 puzzle_count = 2;
+  uint64 file_bytes = 3;
+  int64 built_at_unix = 4;
+  string source_file = 5;
+  uint64 source_bytes = 6;
+  RemoteVersion source_version = 7;
+  uint64 skipped_count = 8;
+  uint32 rating_min = 9;
+  uint32 rating_max = 10;
+}
+
+enum OperationKind {
+  OPERATION_KIND_UNSPECIFIED = 0;
+  OPERATION_KIND_DOWNLOAD = 1;
+  OPERATION_KIND_BUILD = 2;
+  OPERATION_KIND_CHECK_UPDATE = 3;
+}
+
+message Operation {
+  OperationKind kind = 1;
+  bool cancelling = 2;
+  uint64 done = 3;
+  // Zero when unknown.
+  uint64 total = 4;
+  double rate = 5;
+  uint64 rows = 6;
+}
+
+message Status {
+  string data_dir = 1;
+  StoreSummary store = 2;
+  string store_problem = 3;
+  Operation operation = 4;
+  uint64 partial_bytes = 5;
+  uint64 partial_total = 6;
+  RemoteVersion download = 7;
+  RemoteVersion update_available = 8;
+  bool update_ready = 9;
+}
+
+message CatalogueTheme {
+  string key = 1;
+  uint32 bit = 2;
+  string group = 3;
+  string name = 4;
+  string description = 5;
+  uint64 count = 6;
+}
+
+message CatalogueOpening {
+  uint32 id = 1;
+  string tag = 2;
+  string name = 3;
+  // For a variation, its family id; 0 for a family.
+  uint32 family = 4;
+  uint64 count = 5;
+}
+
+message Catalogue {
+  repeated CatalogueTheme themes = 1;
+  repeated string groups = 2;
+  repeated CatalogueOpening families = 3;
+  repeated CatalogueOpening variations = 4;
+  uint32 rating_min = 5;
+  uint32 rating_max = 6;
+}
+
+message Puzzle {
+  uint64 index = 1;
+  string id = 2;
+  string fen = 3;
+  repeated string moves = 4;
+  uint32 rating = 5;
+  uint32 deviation = 6;
+  sint32 popularity = 7;
+  uint32 plays = 8;
+  repeated string themes = 9;
+  string opening_family = 10;
+  string opening_variation = 11;
+  string game_url = 12;
+  // Milliseconds since the Unix epoch; 0 when the puzzle was never a daily puzzle.
+  int64 daily_date = 13;
+  Side solver = 14;
+}
+
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  SESSION_STATE_OPPONENT_TO_MOVE = 1;
+  SESSION_STATE_SOLVING = 2;
+  SESSION_STATE_REPLY_PENDING = 3;
+  SESSION_STATE_SOLVED = 4;
+  SESSION_STATE_SOLUTION_SHOWN = 5;
+}
+
+enum MoveOutcome {
+  MOVE_OUTCOME_UNSPECIFIED = 0;
+  MOVE_OUTCOME_ILLEGAL = 1;
+  MOVE_OUTCOME_WRONG = 2;
+  MOVE_OUTCOME_CORRECT = 3;
+  MOVE_OUTCOME_SOLVED = 4;
+}
+
+message MoveEntry {
+  string san = 1;
+  string uci = 2;
+  bool solver = 3;
+  bool white = 4;
+  uint32 number = 5;
+}
+
+message SessionView {
+  Puzzle puzzle = 1;
+  SessionState state = 2;
+  uint32 mistakes = 3;
+  uint32 hints = 4;
+  bool solution_shown = 5;
+  bool replay = 6;
+  repeated MoveEntry moves = 7;
+  uint32 played = 8;
+  uint32 view = 9;
+  // 64 characters from a1 to h8: '.' empty, PNBRQK White, pnbrqk Black.
+  string board = 10;
+  string fen = 11;
+  Side side_to_move = 12;
+  // Squares 0 (a1) to 63 (h8); -1 when absent.
+  sint32 last_from = 13;
+  sint32 last_to = 14;
+  sint32 check_square = 15;
+  sint32 hint_square = 16;
+  repeated string legal_moves = 17;
+}
+
+message SessionResult {
+  // Unspecified unless the command was a move.
+  MoveOutcome outcome = 1;
+  SessionView view = 2;
+}
+
+enum EventLevel {
+  EVENT_LEVEL_INFO = 0;
+  EVENT_LEVEL_SUCCESS = 1;
+  EVENT_LEVEL_WARNING = 2;
+  EVENT_LEVEL_ERROR = 3;
+}
+
+enum EventAction {
+  EVENT_ACTION_NONE = 0;
+  EVENT_ACTION_RETRY_DOWNLOAD = 1;
+  EVENT_ACTION_RETRY_BUILD = 2;
+  EVENT_ACTION_RETRY_CHECK = 3;
+  EVENT_ACTION_SWITCH_STORE = 4;
+}
+
+message Event {
+  EventLevel level = 1;
+  string message = 2;
+  EventAction action = 3;
+  int64 unix_ms = 4;
+}
+
+message EventBatch {
+  repeated Event events = 1;
+}

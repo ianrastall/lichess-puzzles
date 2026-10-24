@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Exercises the real C# to Rust DLL boundary. Run: dotnet run -c Release (exit code 0 on success). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LichessPuzzles.Interop\LichessPuzzles.Interop.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(RepoRoot)core\domain\tests\fixtures\sample_puzzles.csv" Link="sample_puzzles.csv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="$(RepoRoot)build\native.targets" />
+</Project>

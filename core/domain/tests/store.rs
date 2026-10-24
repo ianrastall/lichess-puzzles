@@ -95,10 +95,21 @@ fn filters_count_match_and_sample() {
     let mates = Filter { themes_any: vec!["mate".into()], ..Default::default() }.compile(&store).unwrap();
     let matching = filter::matching(&store, &mates);
     assert_eq!(matching.iter().map(|&i| store.id(i as usize)).collect::<Vec<_>>(), ["0000H", "00sHx"]);
-    let (total, per_theme) = filter::theme_counts(&store, &mates);
-    assert_eq!(total, 2);
+    let counts = filter::counts(&store, &mates);
+    assert_eq!(counts.total, 2);
     let mate_bit = store.info().themes.iter().position(|t| t == "mate").unwrap();
-    assert_eq!(per_theme[mate_bit], 2);
+    assert_eq!(counts.themes[mate_bit], 2);
+    assert_eq!(counts.families.iter().sum::<usize>(), 2);
+    assert_eq!(counts.variations.iter().sum::<usize>(), 2);
+    let all_counts = filter::counts(&store, &Filter::default().compile(&store).unwrap());
+    assert_eq!(all_counts.families[0], csv_without_opening());
+
+    for seed in 0..20 {
+        let picked = filter::pick(&store, &mates, seed).unwrap();
+        assert!(["0000H", "00sHx"].contains(&store.id(picked).as_str()));
+    }
+    let none = Filter { rating_min: Some(4000), ..Default::default() }.compile(&store).unwrap();
+    assert_eq!(filter::pick(&store, &none, 1), None);
 
     let all = Filter::default().compile(&store).unwrap();
     let mut picked = filter::sample(&store, &all, 5, 42);
@@ -107,6 +118,15 @@ fn filters_count_match_and_sample() {
     picked.dedup();
     assert_eq!(picked.len(), 5);
     assert_eq!(filter::sample(&store, &mates, 10, 1).len(), 2);
+}
+
+fn csv_without_opening() -> usize {
+    std::fs::read_to_string(SAMPLE)
+        .unwrap()
+        .lines()
+        .skip(1)
+        .filter(|l| l.split(',').nth(9).unwrap_or("").is_empty())
+        .count()
 }
 
 #[test]

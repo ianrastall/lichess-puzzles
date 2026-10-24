@@ -2,9 +2,12 @@
 //! puzzle store, filtering it and the chess rules used to check solutions.
 
 pub mod build;
+pub mod catalogue;
 pub mod chess;
 pub mod filter;
 pub mod puzzle_id;
+pub mod service;
+pub mod session;
 pub mod source;
 pub mod store;
 

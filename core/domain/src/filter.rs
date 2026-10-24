@@ -170,30 +170,82 @@ pub fn matching(store: &Store, filter: &CompiledFilter) -> Vec<u32> {
     .concat()
 }
 
-/// Matching puzzles per theme bit, plus the total, for showing counts beside theme choices.
-pub fn theme_counts(store: &Store, filter: &CompiledFilter) -> (usize, Vec<usize>) {
-    let themes = store.info().themes.len();
+/// Matching puzzles in total, per theme bit and per opening family and variation id.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Counts {
+    pub total: usize,
+    pub themes: Vec<usize>,
+    /// Indexed by family id; index 0 counts puzzles without an opening.
+    pub families: Vec<usize>,
+    /// Indexed by variation id; index 0 counts puzzles without a variation.
+    pub variations: Vec<usize>,
+}
+
+impl Counts {
+    fn new(store: &Store) -> Counts {
+        let info = store.info();
+        Counts {
+            total: 0,
+            themes: vec![0; info.themes.len()],
+            families: vec![0; info.opening_families.len() + 1],
+            variations: vec![0; info.opening_variations.len() + 1],
+        }
+    }
+
+    fn add(mut self, other: Counts) -> Counts {
+        self.total += other.total;
+        for (mine, theirs) in [
+            (&mut self.themes, other.themes),
+            (&mut self.families, other.families),
+            (&mut self.variations, other.variations),
+        ] {
+            mine.iter_mut().zip(theirs).for_each(|(m, t)| *m += t);
+        }
+        self
+    }
+}
+
+/// Counts for showing beside theme and opening choices.
+pub fn counts(store: &Store, filter: &CompiledFilter) -> Counts {
     scan(store, |_, chunk| {
-        let mut counts = vec![0usize; themes];
-        let mut total = 0;
+        let mut counts = Counts::new(store);
         for r in chunk.as_chunks::<RECORD_SIZE>().0 {
             let record = Record::decode(r);
             if filter.matches(&record) {
-                total += 1;
+                counts.total += 1;
+                counts.families[record.family as usize] += 1;
+                counts.variations[record.variation as usize] += 1;
                 let mut mask = record.themes;
                 while mask != 0 {
-                    counts[mask.trailing_zeros() as usize] += 1;
+                    counts.themes[mask.trailing_zeros() as usize] += 1;
                     mask &= mask - 1;
                 }
             }
         }
-        (total, counts)
+        counts
     })
     .into_iter()
-    .fold((0, vec![0; themes]), |(total, mut sum), (t, counts)| {
-        sum.iter_mut().zip(counts).for_each(|(s, c)| *s += c);
-        (total + t, sum)
-    })
+    .fold(Counts::new(store), Counts::add)
+}
+
+/// One matching puzzle chosen uniformly at random from `seed`, without collecting every match.
+pub fn pick(store: &Store, filter: &CompiledFilter, seed: u64) -> Option<usize> {
+    let per_chunk = scan(store, |start, chunk| {
+        let n = chunk.as_chunks::<RECORD_SIZE>().0.iter().filter(|r| filter.matches(&Record::decode(r))).count();
+        (start, chunk.len() / RECORD_SIZE, n)
+    });
+    let total: usize = per_chunk.iter().map(|c| c.2).sum();
+    if total == 0 {
+        return None;
+    }
+    let mut target = (SplitMix64(seed).next() % total as u64) as usize;
+    for (start, len, n) in per_chunk {
+        if target < n {
+            return (start..start + len).filter(|&i| filter.matches(&store.record(i))).nth(target);
+        }
+        target -= n;
+    }
+    None
 }
 
 /// Up to `n` distinct matching puzzles chosen at random from `seed`.

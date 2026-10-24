@@ -167,9 +167,17 @@ impl Source {
         read_record(&self.record_path())
     }
 
-    fn discard_part(&self) {
+    /// Deletes an interrupted download.
+    pub fn discard_part(&self) {
         let _ = fs::remove_file(self.part_path());
         let _ = fs::remove_file(self.part_record_path());
+    }
+
+    /// Bytes of an interrupted download that can be resumed, and the full length if known.
+    pub fn partial(&self) -> Option<(u64, Option<u64>)> {
+        let record = read_record(&self.part_record_path()).filter(|r| r.url == self.url)?;
+        let len = file_len(&self.part_path());
+        (len > 0).then_some((len, record.version.length))
     }
 
     /// The downloaded file's version, if a complete download from this URL is present.
@@ -188,12 +196,16 @@ impl Source {
     }
 
     pub fn check_update(&self) -> Result<UpdateCheck, SourceError> {
-        let remote = self.remote_version()?;
-        Ok(match self.local_version() {
+        Ok(self.check_update_against(&self.remote_version()?))
+    }
+
+    /// Compares the completed download with a version already read from the server.
+    pub fn check_update_against(&self, remote: &RemoteVersion) -> UpdateCheck {
+        match self.local_version() {
             None => UpdateCheck::NotDownloaded,
-            Some(local) if local.same_file(&remote) => UpdateCheck::Current(remote),
-            Some(local) => UpdateCheck::Available { local, remote },
-        })
+            Some(local) if local.same_file(remote) => UpdateCheck::Current(remote.clone()),
+            Some(local) => UpdateCheck::Available { local, remote: remote.clone() },
+        }
     }
 
     /// Downloads the file, resuming a matching partial download. Network failures are retried

@@ -275,8 +275,9 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
         Command::Themes(args) => {
             let store = open(&store_path)?;
             let compiled = args.filter().compile(&store).map_err(|e| e.to_string())?;
-            let (total, counts) = filter::theme_counts(&store, &compiled);
-            let mut rows: Vec<(&String, usize)> = store.info().themes.iter().zip(counts).collect();
+            let counts = filter::counts(&store, &compiled);
+            let total = counts.total;
+            let mut rows: Vec<(&String, usize)> = store.info().themes.iter().zip(counts.themes).collect();
             rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
             for (theme, count) in rows {
                 println!("{:>10}  {theme}", group(count as u64));
@@ -287,14 +288,11 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
         Command::Openings(args) => {
             let store = open(&store_path)?;
             let compiled = args.filter().compile(&store).map_err(|e| e.to_string())?;
-            let mut counts = vec![0u64; store.info().opening_families.len() + 1];
-            for index in filter::matching(&store, &compiled) {
-                counts[store.record(index as usize).family as usize] += 1;
-            }
+            let counts = filter::counts(&store, &compiled).families;
             let mut rows: Vec<(String, u64)> = counts
                 .iter()
                 .enumerate()
-                .map(|(id, &n)| (store.family_tag(id as u16).unwrap_or("(no opening)").to_owned(), n))
+                .map(|(id, &n)| (store.family_tag(id as u16).unwrap_or("(no opening)").to_owned(), n as u64))
                 .filter(|(_, n)| *n > 0)
                 .collect();
             rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));

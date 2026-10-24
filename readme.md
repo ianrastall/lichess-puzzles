@@ -12,7 +12,7 @@ This is a fresh repository. The previous [Lichess Puzzle Desktop](<D:/dev/proj/l
 
 ## Desktop app
 
-Install with `dist/LichessPuzzles-<version>-win-x64-setup.exe`. It installs for your Windows account without an administrator prompt, adds **Jupiter > Lichess Puzzles** to Start, and can be removed from **Settings > Apps > Installed apps**; puzzles, players and history are kept. The installer is not signed, so SmartScreen may ask you to confirm. Alternatively run `LichessPuzzles.exe` from `dist/LichessPuzzles` or the zip. Windows 11 24H2 or newer, x64; no separate runtime installation is needed.
+Install with `dist/LichessPuzzles-<version>-win-x64-setup.exe`. It installs for your Windows account without an administrator prompt, adds **Lichess Puzzles** to Start, and can be removed from **Settings > Apps > Installed apps**; puzzles, players and history are kept. The installer is not signed, so SmartScreen may ask you to confirm. Alternatively run `LichessPuzzles.exe` from `dist/LichessPuzzles` or the zip. Windows 11 24H2 or newer, x64; no separate runtime installation is needed.
 
 On first run the app offers to download the Lichess puzzle database (about 300 MB) and build the store (about 500 MB, half a minute), or to import a `.csv` or `.csv.zst` you already have. Filters apply as they change and can be saved as presets. **Next puzzle** (Ctrl+N) draws a matching puzzle at random or near your rating, optionally skipping puzzles you have played. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
 

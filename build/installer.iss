@@ -32,8 +32,13 @@ ChangesAssociations=yes
 [Files]
 Source: "..\dist\LichessPuzzles\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb"
 
+[InstallDelete]
+; Versions before 24 October 2026 put the shortcut in a Jupiter folder; Start now lists the app by name.
+Type: files; Name: "{autoprograms}\Jupiter\Lichess Puzzles.lnk"
+Type: dirifempty; Name: "{autoprograms}\Jupiter"
+
 [Icons]
-Name: "{autoprograms}\Jupiter\Lichess Puzzles"; Filename: "{app}\LichessPuzzles.exe"; WorkingDir: "{app}"; IconFilename: "{app}\Assets\app.ico"; AppUserModelID: "Jupiter.LichessPuzzles"
+Name: "{autoprograms}\Lichess Puzzles"; Filename: "{app}\LichessPuzzles.exe"; WorkingDir: "{app}"; IconFilename: "{app}\Assets\app.ico"; AppUserModelID: "Jupiter.LichessPuzzles"
 
 [Run]
 Filename: "{app}\LichessPuzzles.exe"; Description: "Open Lichess Puzzles"; Flags: nowait postinstall skipifsilent

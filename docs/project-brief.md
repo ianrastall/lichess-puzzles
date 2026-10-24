@@ -140,7 +140,7 @@ Built 24 October 2026:
   - Iterative-deepening alpha-beta (principal variation search), quiescence search, a transposition table, killer and history move ordering, and Michniewski's piece-square tables.
   - It is off by default. When on, it runs on a core thread after the puzzle ends, or while solving if chosen, with a score, best line, depth and an evaluation bar.
   - `lichess-puzzles analyse` measures it. On random puzzles it found the solution's first move in 40 of 40 at one second each; on puzzles rated 2200 and above, 33 of 40 (82%) at both one and three seconds.
-- **Installer:** `build/installer.iss` (Inno Setup 6). It installs per user to `%LOCALAPPDATA%\Programs\Jupiter\LichessPuzzles` with a **Jupiter > Lichess Puzzles** Start menu entry and an Installed apps uninstaller. Data is kept on uninstall. `build.ps1` builds it unless `-PortableOnly` is given. The installer is unsigned.
+- **Installer:** `build/installer.iss` (Inno Setup 6). It installs per user to `%LOCALAPPDATA%\Programs\Jupiter\LichessPuzzles` with a **Lichess Puzzles** Start menu entry at the top level and an Installed apps uninstaller. Data is kept on uninstall. `build.ps1` builds it unless `-PortableOnly` is given. The installer is unsigned.
 - **Checks:**
   - 36 Rust tests and 35 checks across the C#–Rust boundary pass.
   - The published app started with the full store. It restored the puzzle in progress, created the first player at 1500 ± 350 (provisional) and showed the History view's empty state.

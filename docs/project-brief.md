@@ -113,7 +113,7 @@ Store format, filter fields and CLI commands are described in the [readme](../re
 ## Staged progression
 
 1. Confirm this brief and the open questions.
-2. Workbench layout: regions, menus, empty/downloading/building/ready/error states, keyboard behaviour.
+2. Workbench layout: regions, menus, empty/downloading/building/ready/error states, keyboard behaviour. **Drafted 24 October 2026:** [workbench layout](workbench-layout.md), with its decisions to confirm.
 3. Technical proof: Rust workspace and CLI that download, build the store and answer a filtered count against the real database, with measured build time, store size and query time. **Done 24 October 2026.**
 4. ABI and WinUI shell over that core: open the store, filter, play a puzzle to completion.
 5. Ratings, history, export, installer.

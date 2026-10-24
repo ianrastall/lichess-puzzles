@@ -5,6 +5,7 @@ A Windows desktop app for downloading, filtering and playing the [Lichess puzzle
 Status: the Rust domain core and command-line shell are built (stage 3 of the [project brief](docs/project-brief.md)). The WinUI 3 shell, ratings, history and export follow.
 
 - [Project brief](docs/project-brief.md): decisions, source data, workflows, measurements and open questions
+- [Workbench layout](docs/workbench-layout.md): regions, menus, states and keyboard behaviour for the desktop shell
 - [Source map](docs/source-map.json): related folders and their dispositions
 
 This is a fresh repository. The previous [Lichess Puzzle Desktop](<D:/dev/proj/lichess-puzzle-desktop>) remains in place as a reference.

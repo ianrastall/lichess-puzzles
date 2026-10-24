@@ -25,6 +25,9 @@ RestartApplications=no
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+; Tell Explorer and Start to refresh icons after install and uninstall, so a reinstall
+; does not leave a blank Start menu icon.
+ChangesAssociations=yes
 
 [Files]
 Source: "..\dist\LichessPuzzles\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb"

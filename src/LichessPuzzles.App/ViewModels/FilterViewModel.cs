@@ -196,6 +196,14 @@ public sealed partial class FilterViewModel : ObservableObject
     [ObservableProperty]
     public partial string? SelectedPreset { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoPresets), nameof(PresetPlaceholder))]
+    public partial bool HasPresets { get; set; }
+
+    public bool HasNoPresets => !HasPresets;
+
+    public string PresetPlaceholder => HasPresets ? "Current filters" : "No saved presets";
+
     partial void OnChooseIndexChanged(int value) => Changed();
     partial void OnDifficultyOffsetChanged(double value) => Changed();
     partial void OnSkipPlayedChanged(bool value) => Changed();
@@ -222,6 +230,7 @@ public sealed partial class FilterViewModel : ObservableObject
             PresetNames.Add(name);
         }
         SelectedPreset = select is not null && PresetNames.Contains(select) ? select : null;
+        HasPresets = PresetNames.Count > 0;
         _loading = false;
     }
 

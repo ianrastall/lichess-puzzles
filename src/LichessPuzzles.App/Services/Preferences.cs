@@ -21,11 +21,31 @@ public sealed class AppSettings
     public bool ShowThemesWhileSolving { get; set; }
     public int OpponentDelayMs { get; set; } = 600;
     public bool NextAfterCleanSolve { get; set; }
+    /// <summary>New puzzles count toward the current player's rating.</summary>
+    public bool Rated { get; set; } = true;
+
+    // Evaluation
+    public bool EvaluationEnabled { get; set; }
+    public bool EvaluationWhileSolving { get; set; }
+    public double EvaluationSeconds { get; set; } = 2;
+
+    // Export
+    /// <summary>"pgn", "csv" or "epd".</summary>
+    public string ExportFormat { get; set; } = "pgn";
+    /// <summary>PGN starts from the position the solver faces rather than the database FEN.</summary>
+    public bool ExportPlayerStart { get; set; }
 
     // Storage
     public bool KeepDownload { get; set; } = true;
     public bool CheckForUpdatesAtStart { get; set; } = true;
 
+    public FilterState Filter { get; set; } = new();
+    public List<FilterPreset> Presets { get; set; } = [];
+}
+
+public sealed class FilterPreset
+{
+    public string Name { get; set; } = "";
     public FilterState Filter { get; set; } = new();
 }
 
@@ -45,6 +65,12 @@ public sealed class FilterState
     public string Side { get; set; } = "either";
     public int? LengthMin { get; set; }
     public int? LengthMax { get; set; }
+    /// <summary>Choose puzzles near the current player's rating plus <see cref="DifficultyOffset"/>.</summary>
+    public bool NearRating { get; set; }
+    public int DifficultyOffset { get; set; }
+    public bool SkipPlayed { get; set; }
+
+    public FilterState Copy() => JsonSerializer.Deserialize(JsonSerializer.Serialize(this, PreferencesJson.Default.FilterState), PreferencesJson.Default.FilterState)!;
 }
 
 /// <summary>Window and pane layout and the puzzle in progress (ui.json).</summary>
@@ -147,4 +173,5 @@ public sealed class JsonStore<T> where T : class, new()
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(AppSettings))]
 [JsonSerializable(typeof(UiState))]
+[JsonSerializable(typeof(FilterState))]
 internal sealed partial class PreferencesJson : JsonSerializerContext;

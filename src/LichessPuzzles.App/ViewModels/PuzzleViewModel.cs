@@ -57,6 +57,8 @@ public sealed partial class PuzzleViewModel : ObservableObject
     private int _serial;
     private LastAction _last;
     private bool _busy;
+    private bool _rated;
+    private (double Before, double After)? _change;
 
     public PuzzleViewModel(CoreHost host, JsonStore<AppSettings> settings, UiState ui, DispatcherQueue dispatcher)
     {
@@ -67,6 +69,15 @@ public sealed partial class PuzzleViewModel : ObservableObject
     }
 
     public void AttachBoard(IBoardView board) => _board = board;
+
+    /// <summary>Raised with the rating before and after when a rated puzzle is settled.</summary>
+    public event Action<double, double>? RatingSettled;
+
+    /// <summary>Raised when the history may have changed: a mistake, hint, solve, solution or a new puzzle.</summary>
+    public event Action? Recorded;
+
+    /// <summary>Raised with the shown position and whether the puzzle has ended, for the evaluation.</summary>
+    public event Action<string, bool>? PositionShown;
 
     /// <summary>Theme key → display name, and opening tag → display name, from the catalogue.</summary>
     public Dictionary<string, string> ThemeNames { get; set; } = [];
@@ -113,17 +124,24 @@ public sealed partial class PuzzleViewModel : ObservableObject
         {
             return;
         }
-        await Run(core => core.NextPuzzle(), result => Start(result.View), "A puzzle could not be opened");
+        var filter = _settings.Value.Filter;
+        var near = filter.NearRating;
+        var offset = filter.DifficultyOffset;
+        await Run(core => core.NextPuzzle(near, offset), result => Start(result.View), "A puzzle could not be opened");
+        Recorded?.Invoke();
     }
 
-    public async Task<string?> LoadAsync(string id)
+    /// <summary>Opens a puzzle by id or link; a replay is neither rated nor recorded.</summary>
+    public async Task<string?> LoadAsync(string id, bool replay = false)
     {
         try
         {
-            var result = await _host.Run(core => core.LoadPuzzle(id));
+            var result = await _host.Run(core => core.LoadPuzzle(id, replay));
             if (result is not null)
             {
                 Start(result.View);
+                Track(result);
+                Recorded?.Invoke();
             }
             return null;
         }
@@ -144,12 +162,12 @@ public sealed partial class PuzzleViewModel : ObservableObject
         var moves = _ui.CurrentPuzzleSolverMoves.ToList();
         try
         {
-            var view = await _host.Run(core =>
+            var restored = await _host.Run(core =>
             {
                 var result = core.LoadPuzzle(id);
                 if (moves.Count == 0)
                 {
-                    return result.View;
+                    return result;
                 }
                 result = core.PlayOpponent();
                 foreach (var move in moves)
@@ -164,13 +182,14 @@ public sealed partial class PuzzleViewModel : ObservableObject
                         break;
                     }
                 }
-                return result.View;
+                return result;
             });
-            if (view is null)
+            if (restored is null)
             {
                 return false;
             }
-            Start(view, keepMoves: true);
+            Start(restored.View, keepMoves: true);
+            Track(restored);
             return true;
         }
         catch (PuzzleCoreException)
@@ -211,6 +230,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
         }
         var from = SquareIndex(uci[..2]);
         var to = SquareIndex(uci.Substring(2, 2));
+        Track(result);
         switch (result.Outcome)
         {
             case MoveOutcome.Wrong:
@@ -219,6 +239,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
                 _board?.ShowMarker(to, BoardMarker.Wrong);
                 _view = result.View;
                 UpdateText();
+                Recorded?.Invoke();
                 _board?.Announce("Not the move. Try again.");
                 After(600, serial, () => _board?.Show(_view, animate: false));
                 break;
@@ -233,6 +254,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
                 RememberMove(uci, finished: true);
                 Apply(result.View, animate: true);
                 _board?.ShowMarker(LastTo(result.View), BoardMarker.Correct);
+                Recorded?.Invoke();
                 var clean = result.View.Mistakes == 0 && result.View.Hints == 0;
                 if (clean && _settings.Value.NextAfterCleanSolve)
                 {
@@ -258,6 +280,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
             Apply(result.View, animate: false);
             _board?.Announce("Hint: move the highlighted piece.");
         }, "The hint could not be shown");
+        Recorded?.Invoke();
     }
 
     [RelayCommand]
@@ -273,6 +296,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
             _ui.CurrentPuzzleFinished = true;
             Apply(result.View, animate: true);
         }, "The solution could not be shown");
+        Recorded?.Invoke();
     }
 
     [RelayCommand]
@@ -283,6 +307,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
             return;
         }
         await Run(core => core.Retry(), result => Start(result.View, keepOrientation: true), "The puzzle could not be restarted");
+        Recorded?.Invoke();
     }
 
     /// <summary>Steps through the line: -1/+1, or int.MinValue/int.MaxValue for the ends.</summary>
@@ -370,6 +395,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
             if (result is not null && serial == _serial)
             {
                 apply(result);
+                Track(result);
             }
         }
         catch (PuzzleCoreException e)
@@ -390,6 +416,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
     {
         var serial = ++_serial;
         _last = LastAction.None;
+        _change = null;
         _view = view;
         if (!keepOrientation)
         {
@@ -429,6 +456,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
             }
             _last = LastAction.None;
             Apply(result.View, animate: true);
+            Track(result);
             var move = result.View.Moves.LastOrDefault();
             if (move is not null)
             {
@@ -460,6 +488,31 @@ public sealed partial class PuzzleViewModel : ObservableObject
         UpdateText();
     }
 
+    /// <summary>Takes the rating state from a session result.</summary>
+    private void Track(SessionResult result)
+    {
+        _rated = result.Rated;
+        if (result.RatingSettled && _change is null)
+        {
+            _change = (result.RatingBefore, result.RatingAfter);
+            RatingSettled?.Invoke(result.RatingBefore, result.RatingAfter);
+        }
+        if (_view is not null)
+        {
+            UpdateText();
+        }
+    }
+
+    private string RatingNote(SessionView view)
+    {
+        if (_change is { } c)
+        {
+            var delta = (int)Math.Round(c.After - c.Before);
+            return $" Rating {Format.Count((long)Math.Round(c.After))} ({(delta >= 0 ? "+" : "")}{delta}).";
+        }
+        return view.Replay ? " Replay; not rated." : _rated ? "" : " Not rated.";
+    }
+
     private void RememberMove(string uci, bool finished)
     {
         _ui.CurrentPuzzleSolverMoves.Add(uci);
@@ -483,23 +536,25 @@ public sealed partial class PuzzleViewModel : ObservableObject
         Fen = view.Fen;
 
         var side = p.Solver == Side.Black ? "Black" : "White";
-        var replay = view.Replay ? " Replay." : "";
+        var rating = RatingNote(view);
+        var failedNow = _rated && _change is { } c && c.After < c.Before ? " This puzzle now counts as failed." : "";
         (PromptTitle, PromptMessage, PromptSeverity) = view.State switch
         {
             SessionState.OpponentToMove => ("Opponent's move", "Watch the move that sets up the puzzle.", InfoBarSeverity.Informational),
             SessionState.ReplyPending => ("Best move", "Keep going.", InfoBarSeverity.Success),
-            SessionState.Solving when _last == LastAction.Wrong => ("Not the move", "Try again.", InfoBarSeverity.Warning),
+            SessionState.Solving when _last == LastAction.Wrong => ("Not the move", "Try again." + failedNow, InfoBarSeverity.Warning),
             SessionState.Solving when _last == LastAction.Hint && view.HintSquare >= 0 => ("Hint", "Move the highlighted piece.", InfoBarSeverity.Informational),
             SessionState.Solving when view.View != view.Played => ("Your turn", "Return to the latest position to move.", InfoBarSeverity.Informational),
             SessionState.Solving => ("Your turn", $"Find the best move for {side}.", InfoBarSeverity.Informational),
-            SessionState.Solved when view.Mistakes == 0 && view.Hints == 0 => ("Solved", "Clean solve." + replay, InfoBarSeverity.Success),
-            SessionState.Solved => ("Solved with help", Help(view) + replay, InfoBarSeverity.Warning),
-            SessionState.SolutionShown => ("Solution", "Step through the moves with the arrow keys.", InfoBarSeverity.Informational),
+            SessionState.Solved when view.Mistakes == 0 && view.Hints == 0 => ("Solved", "Clean solve." + rating, InfoBarSeverity.Success),
+            SessionState.Solved => ("Solved with help", Help(view) + rating, InfoBarSeverity.Warning),
+            SessionState.SolutionShown => ("Solution", "Step through the moves with the arrow keys." + rating, InfoBarSeverity.Informational),
             _ => ("", "", InfoBarSeverity.Informational),
         };
 
         BuildMoves(view);
         UpdateCommands();
+        PositionShown?.Invoke(view.Fen, Finished);
     }
 
     private static string Help(SessionView view)

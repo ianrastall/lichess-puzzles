@@ -2,7 +2,7 @@
 
 A Windows desktop app for downloading, filtering and playing the [Lichess puzzle database](https://database.lichess.org/#puzzles) offline. Part of the Jupiter family.
 
-Status: the desktop app plays, filters, downloads and updates the puzzles (stage 4 of the [project brief](docs/project-brief.md)). Players with ratings, history, export, the evaluation engine and an installer follow in stage 5.
+Status: stages 1 to 5 of the [project brief](docs/project-brief.md) are built. The app downloads, filters and plays the puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer.
 
 - [Project brief](docs/project-brief.md): decisions, source data, workflows, measurements and open questions
 - [Workbench layout](docs/workbench-layout.md): regions, menus, states and keyboard behaviour for the desktop shell
@@ -12,9 +12,13 @@ This is a fresh repository. The previous [Lichess Puzzle Desktop](<D:/dev/proj/l
 
 ## Desktop app
 
-Run `LichessPuzzles.exe` from the published folder `dist/LichessPuzzles` (or the zip beside it). Windows 11 24H2 or newer, x64; no separate runtime installation is needed.
+Install with `dist/LichessPuzzles-<version>-win-x64-setup.exe`. It installs for your Windows account without an administrator prompt, adds **Jupiter > Lichess Puzzles** to Start, and can be removed from **Settings > Apps > Installed apps**; puzzles, players and history are kept. The installer is not signed, so SmartScreen may ask you to confirm. Alternatively run `LichessPuzzles.exe` from `dist/LichessPuzzles` or the zip. Windows 11 24H2 or newer, x64; no separate runtime installation is needed.
 
-On first run the app offers to download the Lichess puzzle database (about 300 MB) and build the store (about 500 MB, half a minute), or to import a `.csv` or `.csv.zst` you already have. Filters apply as they change; **Next puzzle** (Ctrl+N) draws a random matching puzzle. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
+On first run the app offers to download the Lichess puzzle database (about 300 MB) and build the store (about 500 MB, half a minute), or to import a `.csv` or `.csv.zst` you already have. Filters apply as they change and can be saved as presets. **Next puzzle** (Ctrl+N) draws a matching puzzle at random or near your rating, optionally skipping puzzles you have played. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
+
+Each player has a Glicko-2 puzzle rating starting at 1500 ± 350; a `?` marks it provisional while the deviation is above 110. With **Rated** on, your first attempt at a puzzle is a game against it, using its rating and deviation from the database. The first wrong move, hint or solution makes it a loss, and a solve without them a win. Leaving a puzzle after playing in it counts as a loss. Replays are not rated. **History** lists every attempt.
+
+**Evaluation** (off by default; **View** or **Settings**) runs a small built-in engine after the puzzle ends, or while solving if you choose. It shows a score, best line and an evaluation bar. It is a guide, not an authority.
 
 ## Command line
 
@@ -28,6 +32,8 @@ lichess-puzzles sample [filter] -n 10 [--seed N]
 lichess-puzzles show <puzzle-id>    one puzzle with its solution in SAN
 lichess-puzzles themes [filter]     matching puzzles per theme
 lichess-puzzles openings [filter]   matching puzzles per opening family
+lichess-puzzles analyse [id] [filter] -n 20 --millis 1000
+                                    run the engine on one or more puzzles and report how often it finds the first move
 ```
 
 Filters: `--rating 1500-1800` (or `1500-`, `-1800`), `--max-rd N`, `--min-popularity N`, `--min-plays N`, `--theme T` (any of those given), `--all-themes T`, `--without-theme T`, `--opening TAG` (family or variation, such as `Sicilian_Defense`), `--solver white|black`, `--length 2-3` (moves the solver plays). Theme and opening options repeat.
@@ -40,7 +46,8 @@ source\download.json                    ETag, Last-Modified and length of the co
 source\lichess_db_puzzle.csv.zst.part   an interrupted download, with its own .part.json record
 puzzles.store                           the puzzle store
 puzzles-next.store                      an update built beside the open store, until it replaces it
-settings.json, ui.json                  the desktop app's settings, filters, layout and puzzle in progress
+players.sqlite                          players, ratings and history
+settings.json, ui.json                  the desktop app's settings, filters, presets, layout and puzzle in progress
 ```
 
 `LICHESS_PUZZLES_DATA_DIR` points the desktop app at another folder.
@@ -64,7 +71,7 @@ Requirements: Rust 1.99.1 (pinned in `rust-toolchain.toml`), .NET SDK 10.0.1xx (
 pwsh build/build.ps1
 ```
 
-This formats, lints and tests the Rust workspace, runs the C# interop checks and publishes `dist/LichessPuzzles` and `dist/LichessPuzzles-<version>-win-x64.zip`, including the CLI. `-SkipChecks` publishes only.
+This formats, lints and tests the Rust workspace, runs the C# interop checks, publishes `dist/LichessPuzzles` and `dist/LichessPuzzles-<version>-win-x64.zip` (including the CLI), and compiles the installer with Inno Setup 6. `-SkipChecks` publishes only; `-PortableOnly` skips the installer.
 
 ```text
 core/domain                    Rust domain core: download, store, filters, session, service
@@ -83,3 +90,4 @@ build                          build script, native build targets, icon script
 - Chess rules: [cozy-chess](https://github.com/analog-hors/cozy-chess), MIT.
 - Pieces: Merida by Armando Hernandez Marroquin, from [lichess-org/lila](https://github.com/lichess-org/lila/tree/master/public/piece/merida), GPL version 2 or later. Distributing the app with these files means complying with that licence; see the brief's open questions.
 - Theme descriptions are written for this app.
+- Evaluation: piece-square tables from Tomasz Michniewski's "simplified evaluation function".

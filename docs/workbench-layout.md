@@ -308,16 +308,10 @@ Ian accepted all six on 24 October 2026:
 5. Flip board on F without a modifier.
 6. The default board colours, and the piece set given the Merida licence question in the brief.
 
-## Implementation status (stage 4, 24 October 2026)
+## Implementation status (24 October 2026)
 
-Built as specified, except for the parts that wait for stage 5:
+Stages 4 and 5 implement this specification, with these differences:
 
-- The History view and the puzzle pane's view selector.
-- The Players menu and player strip.
-- Rated play and the near-my-rating option.
-- Skip played puzzles.
-- Filter presets.
-- The export commands and Save puzzle as PGN.
-- The Evaluation section and settings.
-
-These are left out of the menus rather than shown disabled. The data folder is shown with **Show folder**, but it cannot yet be moved.
+- **Near my rating:** the rating fields still apply, together with the target window, rather than being ignored. The filter pane says so beside the target.
+- **Player strip:** the player menu offers New, Rename, Delete and Clear history directly instead of a separate **Manage players…** dialog.
+- **Data folder:** shown with **Show folder** in Settings and Database details. It cannot yet be moved.

@@ -1,13 +1,16 @@
 <#
 .SYNOPSIS
-    Checks, tests and publishes Lichess Puzzles as a portable win-x64 folder and zip.
+    Checks, tests and publishes Lichess Puzzles as a win-x64 installer, portable folder and zip.
 
 .EXAMPLE
-    pwsh build/build.ps1                 # full check, tests and Release publish
+    pwsh build/build.ps1                 # full check, tests and Release publish with installer
     pwsh build/build.ps1 -SkipChecks     # publish only
+    pwsh build/build.ps1 -PortableOnly   # no installer
 #>
 param(
     [switch]$SkipChecks,
+    [switch]$PortableOnly,
+    [string]$InnoCompiler,
     [string]$VcRuntimeDirectory
 )
 
@@ -31,6 +34,23 @@ if (-not $VcRuntimeDirectory) {
 }
 if (-not $VcRuntimeDirectory -or -not (Test-Path -LiteralPath (Join-Path $VcRuntimeDirectory 'vcruntime140.dll'))) {
     throw 'Visual C++ x64 redistributable files were not found. Install the MSVC build tools or pass -VcRuntimeDirectory.'
+}
+
+if (-not $PortableOnly) {
+    if (-not $InnoCompiler) {
+        $candidates = @(
+            (Join-Path $env:LOCALAPPDATA 'Programs/Inno Setup 6/ISCC.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6/ISCC.exe')
+        )
+        $InnoCompiler = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+        if (-not $InnoCompiler) {
+            $InnoCompiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+        }
+    }
+    if (-not $InnoCompiler -or -not (Test-Path -LiteralPath $InnoCompiler)) {
+        throw 'Install Inno Setup 6, pass -InnoCompiler <ISCC.exe>, or use -PortableOnly.'
+    }
 }
 
 function Invoke-Step([string]$Name, [scriptblock]$Command) {
@@ -64,6 +84,10 @@ try {
     $zip = Join-Path $dist "LichessPuzzles-$version-win-x64.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
     Compress-Archive -Path (Join-Path $appDir '*') -DestinationPath $zip
+    if (-not $PortableOnly) {
+        Invoke-Step 'build installer' { & $InnoCompiler /Qp "/DAppVersion=$version" (Join-Path $PSScriptRoot 'installer.iss') }
+        Write-Host "Installer: $(Join-Path $dist "LichessPuzzles-$version-win-x64-setup.exe")" -ForegroundColor Green
+    }
     Write-Host "Published $appDir and $zip" -ForegroundColor Green
 }
 finally {

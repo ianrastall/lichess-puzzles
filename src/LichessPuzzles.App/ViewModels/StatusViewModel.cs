@@ -29,6 +29,8 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty] public partial string NoticeActionText { get; set; } = "";
     [ObservableProperty] public partial bool HasNoticeAction { get; set; }
     public EventAction NoticeAction { get; private set; }
+    /// <summary>The file for a "Show file" notice.</summary>
+    public string NoticePath { get; private set; } = "";
     private bool _eventNotice;
 
     // Empty state ---------------------------------------------------------------------------------
@@ -73,6 +75,7 @@ public sealed partial class StatusViewModel : ObservableObject
                 { Kind: OperationKind.Download, Done: 0 } => "Connecting to database.lichess.org…",
                 { Kind: OperationKind.Download } => DownloadText(op),
                 { Kind: OperationKind.Build } => $"Building the puzzle store · {Format.Count(op.Rows)} puzzles read" + (known ? $" · {OperationPercent:0}%" : ""),
+                { Kind: OperationKind.Export } => $"Exporting {Format.Count(op.Done)} of {Format.Count(op.Total)} puzzles",
                 _ => "Working…",
             };
         }
@@ -160,6 +163,7 @@ public sealed partial class StatusViewModel : ObservableObject
             _ => InfoBarSeverity.Informational,
         };
         SetNotice(e.Message, severity, e.Action, fromEvent: true);
+        NoticePath = e.Path;
     }
 
     public void Report(string message) => SetNotice(message, InfoBarSeverity.Error, EventAction.None, fromEvent: true);
@@ -186,6 +190,7 @@ public sealed partial class StatusViewModel : ObservableObject
             EventAction.RetryBuild => "Retry",
             EventAction.RetryCheck => "Retry",
             EventAction.SwitchStore => "Switch to new puzzles",
+            EventAction.ShowFile => "Show file",
             _ => "",
         };
         HasNoticeAction = NoticeActionText.Length > 0;

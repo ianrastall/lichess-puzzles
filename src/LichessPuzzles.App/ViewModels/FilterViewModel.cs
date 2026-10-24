@@ -169,6 +169,99 @@ public sealed partial class FilterViewModel : ObservableObject
     [ObservableProperty]
     public partial string RatingNote { get; set; } = "";
 
+    /// <summary>0: at random; 1: near the player's rating.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNearRating), nameof(TargetText))]
+    public partial int ChooseIndex { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TargetText))]
+    public partial double DifficultyOffset { get; set; }
+
+    [ObservableProperty]
+    public partial bool SkipPlayed { get; set; }
+
+    public bool IsNearRating => ChooseIndex == 1;
+
+    /// <summary>The current player's rating, for the target shown with "Near my rating".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TargetText))]
+    public partial double PlayerRating { get; set; } = 1500;
+
+    public string TargetText => $"Target {Format.Count((long)Math.Round(PlayerRating + (double.IsNaN(DifficultyOffset) ? 0 : DifficultyOffset)))} ± 75, widening when nothing is that close. The other filters still apply.";
+
+    /// <summary>Preset names, with an empty first entry for "no preset".</summary>
+    public ObservableCollection<string> PresetNames { get; } = [];
+
+    [ObservableProperty]
+    public partial string? SelectedPreset { get; set; }
+
+    partial void OnChooseIndexChanged(int value) => Changed();
+    partial void OnDifficultyOffsetChanged(double value) => Changed();
+    partial void OnSkipPlayedChanged(bool value) => Changed();
+
+    partial void OnSelectedPresetChanged(string? value)
+    {
+        if (_loading || string.IsNullOrEmpty(value))
+        {
+            return;
+        }
+        var preset = _settings.Value.Presets.FirstOrDefault(p => p.Name == value);
+        if (preset is not null)
+        {
+            ApplyState(preset.Filter.Copy());
+        }
+    }
+
+    private void RefreshPresetNames(string? select)
+    {
+        _loading = true;
+        PresetNames.Clear();
+        foreach (var name in _settings.Value.Presets.Select(p => p.Name).Order(StringComparer.CurrentCultureIgnoreCase))
+        {
+            PresetNames.Add(name);
+        }
+        SelectedPreset = select is not null && PresetNames.Contains(select) ? select : null;
+        _loading = false;
+    }
+
+    public bool PresetExists(string name) => _settings.Value.Presets.Any(p => string.Equals(p.Name, name.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+    /// <summary>Saves the current filters under a name, replacing a preset of the same name.</summary>
+    public void SavePreset(string name)
+    {
+        name = name.Trim();
+        if (name.Length == 0)
+        {
+            return;
+        }
+        Save();
+        _settings.Value.Presets.RemoveAll(p => string.Equals(p.Name, name, StringComparison.CurrentCultureIgnoreCase));
+        _settings.Value.Presets.Add(new FilterPreset { Name = name, Filter = _settings.Value.Filter.Copy() });
+        _settings.Save();
+        RefreshPresetNames(name);
+    }
+
+    public void RenamePreset(string oldName, string newName)
+    {
+        newName = newName.Trim();
+        var preset = _settings.Value.Presets.FirstOrDefault(p => p.Name == oldName);
+        if (preset is null || newName.Length == 0)
+        {
+            return;
+        }
+        preset.Name = newName;
+        _settings.Save();
+        RefreshPresetNames(newName);
+    }
+
+    public void DeletePreset(string name)
+    {
+        _settings.Value.Presets.RemoveAll(p => p.Name == name);
+        _settings.Save();
+        RefreshPresetNames(null);
+    }
+
     partial void OnRatingMinChanged(double value) => Changed();
     partial void OnRatingMaxChanged(double value) => Changed();
     partial void OnMaxDeviationChanged(double value) => Changed();
@@ -216,8 +309,26 @@ public sealed partial class FilterViewModel : ObservableObject
         }
         RatingRange = $"Ratings in this database: {catalogue.RatingMin} to {catalogue.RatingMax}.";
         QualityExpanded = _ui.QualityExpanded;
+        RefreshPresetNames(null);
+        _loading = true;
+        ApplyStateCore(_settings.Value.Filter);
+        _loading = false;
+        IsAvailable = true;
+        RebuildRows();
+        _ = ApplyAsync();
+    }
 
-        var saved = _settings.Value.Filter;
+    /// <summary>Shows a saved filter state and applies it.</summary>
+    private void ApplyState(FilterState state)
+    {
+        _loading = true;
+        ApplyStateCore(state);
+        _loading = false;
+        Changed();
+    }
+
+    private void ApplyStateCore(FilterState saved)
+    {
         RatingMin = saved.RatingMin ?? double.NaN;
         RatingMax = saved.RatingMax ?? double.NaN;
         MaxDeviation = saved.MaxDeviation ?? double.NaN;
@@ -238,10 +349,9 @@ public sealed partial class FilterViewModel : ObservableObject
         {
             Openings.Add(new OpeningToken(tag, _openings[tag].Name));
         }
-        _loading = false;
-        IsAvailable = true;
-        RebuildRows();
-        _ = ApplyAsync();
+        ChooseIndex = saved.NearRating ? 1 : 0;
+        DifficultyOffset = saved.DifficultyOffset;
+        SkipPlayed = saved.SkipPlayed;
     }
 
     public void Unload()
@@ -329,6 +439,10 @@ public sealed partial class FilterViewModel : ObservableObject
             row.State = ThemeState.NotUsed;
         }
         Openings.Clear();
+        ChooseIndex = 0;
+        DifficultyOffset = 0;
+        SkipPlayed = false;
+        SelectedPreset = null;
         _loading = false;
         Changed();
     }
@@ -340,6 +454,15 @@ public sealed partial class FilterViewModel : ObservableObject
             return;
         }
         Save();
+        // Edited filters no longer match the preset they came from.
+        if (SelectedPreset is { } name && _settings.Value.Presets.FirstOrDefault(p => p.Name == name) is { } preset
+            && System.Text.Json.JsonSerializer.Serialize(preset.Filter, PreferencesJson.Default.FilterState)
+               != System.Text.Json.JsonSerializer.Serialize(_settings.Value.Filter, PreferencesJson.Default.FilterState))
+        {
+            _loading = true;
+            SelectedPreset = null;
+            _loading = false;
+        }
         _debounce.Stop();
         _debounce.Start();
     }
@@ -361,6 +484,9 @@ public sealed partial class FilterViewModel : ObservableObject
         f.ThemesIncluded = _themes.Where(t => t.State == ThemeState.Include).Select(t => t.Key).ToList();
         f.ThemesExcluded = _themes.Where(t => t.State == ThemeState.Exclude).Select(t => t.Key).ToList();
         f.Openings = Openings.Select(o => o.Tag).ToList();
+        f.NearRating = ChooseIndex == 1;
+        f.DifficultyOffset = double.IsNaN(DifficultyOffset) ? 0 : (int)Math.Round(Math.Clamp(DifficultyOffset, -600, 600));
+        f.SkipPlayed = SkipPlayed;
         _settings.Save();
     }
 
@@ -397,7 +523,8 @@ public sealed partial class FilterViewModel : ObservableObject
         Counts? counts;
         try
         {
-            counts = await _host.Run(core => core.SetFilter(filter));
+            var skip = _settings.Value.Filter.SkipPlayed;
+            counts = await _host.Run(core => core.SetFilter(filter, skip));
         }
         catch (PuzzleCoreException e)
         {

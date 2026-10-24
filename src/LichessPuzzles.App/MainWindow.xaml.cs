@@ -3,6 +3,7 @@ using Jupiter.LichessPuzzles.App.Services;
 using Jupiter.LichessPuzzles.App.ViewModels;
 using Jupiter.LichessPuzzles.App.Views;
 using Jupiter.LichessPuzzles.Messages;
+using Player = Jupiter.LichessPuzzles.Messages.Player;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -42,8 +43,11 @@ public sealed partial class MainWindow : Window, IBoardView
 
         _filterPane = new FilterPane(app.Filter);
         _filterPane.CloseRequested += () => SetFiltersOpen(false);
-        _puzzlePane = new PuzzlePane(app.Puzzle, app.Host);
+        _puzzlePane = new PuzzlePane(app.Puzzle, app.Player, app.History, app.Evaluation, app.Host);
+        _puzzlePane.PlayerCommandRequested += command => _ = PlayerCommandAsync(command);
         PuzzleHost.Child = _puzzlePane;
+        app.Player.Changed += RebuildPlayersMenu;
+        app.Evaluation.PropertyChanged += (_, _) => UpdateEvaluationBar();
 
         var ui = app.Ui.Value;
         FilterColumn.Width = new GridLength(Math.Clamp(ui.FilterPaneWidth, 260, 480));
@@ -66,6 +70,8 @@ public sealed partial class MainWindow : Window, IBoardView
     }
 
     public PuzzleViewModel Puzzle { get; }
+
+    public bool ShowingHistory => _puzzlePane.ShowingHistory;
 
     public StatusViewModel Status { get; }
 
@@ -116,6 +122,9 @@ public sealed partial class MainWindow : Window, IBoardView
         Board.SetColors(light, dark);
         Board.ShowCoordinates = settings.ShowCoordinates;
         CoordinatesItem.IsChecked = settings.ShowCoordinates;
+        EvaluationItem.IsChecked = settings.EvaluationEnabled;
+        EvaluationSolvingItem.IsChecked = settings.EvaluationWhileSolving;
+        EvaluationSolvingItem.IsEnabled = settings.EvaluationEnabled;
         var animations = new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
         Board.AnimationDuration = !animations || settings.MoveAnimation == "Off" ? TimeSpan.Zero
             : settings.MoveAnimation == "Fast" ? TimeSpan.FromMilliseconds(100)
@@ -142,7 +151,9 @@ public sealed partial class MainWindow : Window, IBoardView
         GoToItem.IsEnabled = hasStore;
         FirstItem.IsEnabled = BackItem.IsEnabled = Puzzle.CanGoBack;
         ForwardItem.IsEnabled = LatestItem.IsEnabled = Puzzle.CanGoForward;
-        CopyFenItem.IsEnabled = CopyLinkItem.IsEnabled = OpenLichessItem.IsEnabled = view is not null;
+        CopyFenItem.IsEnabled = CopyLinkItem.IsEnabled = CopyPgnItem.IsEnabled = SavePgnItem.IsEnabled = OpenLichessItem.IsEnabled = view is not null;
+        ExportMatchingItem.IsEnabled = hasStore && !running && _app.Filter.HasMatches;
+        ExportPlayedItem.IsEnabled = hasStore && !running;
         OpenGameItem.IsEnabled = view is not null && Puzzle.GameUrl.Length > 0;
     }
 
@@ -349,6 +360,7 @@ public sealed partial class MainWindow : Window, IBoardView
     {
         var keep = _app.Settings.Value.KeepDownload;
         var action = Status.NoticeAction;
+        var path = Status.NoticePath;
         Status.DismissNotice();
         switch (action)
         {
@@ -363,6 +375,16 @@ public sealed partial class MainWindow : Window, IBoardView
                 break;
             case EventAction.SwitchStore:
                 await _app.Host.Try(c => c.SwitchStore(), "Switching to the new puzzles failed");
+                break;
+            case EventAction.ShowFile when path.Length > 0:
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", ArgumentList = { $"/select,{path}" } });
+                }
+                catch (System.ComponentModel.Win32Exception ex)
+                {
+                    Status.Report($"The file could not be shown: {ex.Message}");
+                }
                 break;
         }
     }
@@ -404,6 +426,198 @@ public sealed partial class MainWindow : Window, IBoardView
     }
 
     private void OnFlip(object sender, RoutedEventArgs e) => Puzzle.Flip();
+
+    private void OnShowPuzzle(object sender, RoutedEventArgs e) => _puzzlePane.ShowPuzzle();
+
+    private void OnShowHistory(object sender, RoutedEventArgs e) => _puzzlePane.ShowHistory();
+
+    private void OnToggleEvaluation(object sender, RoutedEventArgs e)
+    {
+        _app.Settings.Value.EvaluationEnabled = EvaluationItem.IsChecked;
+        _app.Settings.Save();
+        ApplyEvaluationSettings();
+    }
+
+    private void OnToggleEvaluationSolving(object sender, RoutedEventArgs e)
+    {
+        _app.Settings.Value.EvaluationWhileSolving = EvaluationSolvingItem.IsChecked;
+        _app.Settings.Save();
+        ApplyEvaluationSettings();
+    }
+
+    /// <summary>Shows or hides the evaluation for the current position after a setting changes.</summary>
+    public void ApplyEvaluationSettings()
+    {
+        ApplyBoardSettings();
+        if (Puzzle.View is { } view)
+        {
+            _app.Evaluation.Hide();
+            _app.Evaluation.Show(view.Fen, view.State is SessionState.Solved or SessionState.SolutionShown);
+        }
+    }
+
+    private void UpdateEvaluationBar()
+    {
+        var evaluation = _app.Evaluation;
+        EvaluationBar.Visibility = ShowIf(evaluation.IsVisible);
+        var white = Math.Clamp(evaluation.WhiteShare, 0.02, 0.98);
+        WhiteShareRow.Height = new GridLength(white, GridUnitType.Star);
+        BlackShareRow.Height = new GridLength(1 - white, GridUnitType.Star);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(EvaluationBar, evaluation.BarName);
+    }
+
+    // Export ------------------------------------------------------------------------------------
+
+    private async void OnExportMatching(object sender, RoutedEventArgs e)
+    {
+        var count = _app.Filter.MatchCount;
+        var choice = await Dialogs.ShowExportAsync(Root.XamlRoot, this, "Export matching puzzles",
+            $"{Format.Count(count)} puzzles match the current filters.", "lichess-puzzles", _app.Settings);
+        if (choice is not null)
+        {
+            await _app.Host.Try(c => c.StartExport(ExportSource.Matching, choice.Format, choice.PlayerStart, choice.Path), "The export could not start");
+        }
+    }
+
+    private async void OnExportPlayed(object sender, RoutedEventArgs e)
+    {
+        var name = _app.Player.Name;
+        var choice = await Dialogs.ShowExportAsync(Root.XamlRoot, this, "Export played puzzles",
+            $"The puzzles {name} has played, newest first.", $"played-{name}", _app.Settings);
+        if (choice is not null)
+        {
+            await _app.Host.Try(c => c.StartExport(ExportSource.Played, choice.Format, choice.PlayerStart, choice.Path), "The export could not start");
+        }
+    }
+
+    private async void OnSavePgn(object sender, RoutedEventArgs e)
+    {
+        if (Puzzle.View is null)
+        {
+            return;
+        }
+        var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = $"lichess-puzzle-{Puzzle.PuzzleId}" };
+        picker.FileTypeChoices.Add("PGN", [".pgn"]);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        if (await picker.PickSaveFileAsync() is not { } file)
+        {
+            return;
+        }
+        var playerStart = _app.Settings.Value.ExportPlayerStart;
+        string? pgn = null;
+        await _app.Host.Try(c => pgn = c.GetPuzzlePgn(playerStart), "The PGN could not be made");
+        if (pgn is null)
+        {
+            return;
+        }
+        try
+        {
+            await File.WriteAllTextAsync(file.Path, pgn);
+            Status.AddEvent(new Event { Level = EventLevel.Success, Message = $"Saved puzzle {Puzzle.PuzzleId} to {file.Path}.", Action = EventAction.ShowFile, Path = file.Path });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Status.Report($"The PGN could not be saved: {ex.Message}");
+        }
+    }
+
+    private async void OnCopyPgn(object sender, RoutedEventArgs e)
+    {
+        var playerStart = _app.Settings.Value.ExportPlayerStart;
+        string? pgn = null;
+        await _app.Host.Try(c => pgn = c.GetPuzzlePgn(playerStart), "The PGN could not be made");
+        if (pgn is not null)
+        {
+            Copy(pgn);
+        }
+    }
+
+    // Players -----------------------------------------------------------------------------------
+
+    private void RebuildPlayersMenu()
+    {
+        PlayersMenu.Items.Clear();
+        var player = _app.Player;
+        foreach (var p in player.Players)
+        {
+            var item = new RadioMenuFlyoutItem { Text = p.Name, GroupName = "players", IsChecked = p.Id == player.Current?.Id, Tag = p.Id };
+            item.Click += async (s, _) => await player.SwitchToAsync((long)((FrameworkElement)s).Tag);
+            PlayersMenu.Items.Add(item);
+        }
+        PlayersMenu.Items.Add(new MenuFlyoutSeparator());
+        var rated = new ToggleMenuFlyoutItem { Text = "Rated", IsChecked = player.Rated };
+        rated.Click += (_, _) => player.Rated = rated.IsChecked;
+        PlayersMenu.Items.Add(rated);
+        PlayersMenu.Items.Add(new MenuFlyoutSeparator());
+        foreach (var (text, command) in new[]
+        {
+            ("New player…", PlayerCommand.New),
+            ("Rename player…", PlayerCommand.Rename),
+            ("Delete player…", PlayerCommand.Delete),
+            ("Clear history…", PlayerCommand.ClearHistory),
+        })
+        {
+            var item = new MenuFlyoutItem { Text = text, IsEnabled = command != PlayerCommand.Delete || player.Players.Count > 1 };
+            item.Click += (_, _) => _ = PlayerCommandAsync(command);
+            PlayersMenu.Items.Add(item);
+        }
+    }
+
+    private async Task PlayerCommandAsync(PlayerCommand command)
+    {
+        var player = _app.Player;
+        var root = Root.XamlRoot;
+        bool NameTaken(string name, long except) => player.Players.Any(p => p.Id != except && string.Equals(p.Name, name, StringComparison.CurrentCultureIgnoreCase));
+        switch (command)
+        {
+            case PlayerCommand.New:
+            {
+                var name = await Dialogs.PromptAsync(root, "New player", "Name", "", "Add player",
+                    n => NameTaken(n, 0) ? "Another player already has this name." : null, blockOnWarning: true);
+                if (name is null)
+                {
+                    return;
+                }
+                Player? added = null;
+                if (await _app.Host.Try(c => added = c.AddPlayer(name), "The player could not be added") && added is not null)
+                {
+                    await player.SwitchToAsync(added.Id);
+                }
+                break;
+            }
+            case PlayerCommand.Rename when player.Current is { } current:
+            {
+                var name = await Dialogs.PromptAsync(root, "Rename player", "Name", current.Name, "Rename",
+                    n => NameTaken(n, current.Id) ? "Another player already has this name." : null, blockOnWarning: true);
+                if (name is not null)
+                {
+                    await _app.Host.Try(c => c.RenamePlayer(current.Id, name), "The player could not be renamed");
+                    await player.RefreshAsync();
+                }
+                break;
+            }
+            case PlayerCommand.Delete when player.Current is { } current:
+            {
+                if (await Dialogs.ConfirmAsync(root, "Delete player?",
+                        $"Delete {current.Name}, with a rating of {current.Rating:0} and their played puzzles? This cannot be undone.", "Delete player"))
+                {
+                    await _app.Host.Try(c => c.DeletePlayer(current.Id), "The player could not be deleted");
+                    await player.RefreshAsync();
+                }
+                break;
+            }
+            case PlayerCommand.ClearHistory when player.Current is { } current:
+            {
+                if (await Dialogs.ConfirmAsync(root, "Clear history?",
+                        $"Forget every puzzle {current.Name} has played? The rating is kept. This cannot be undone.", "Clear history"))
+                {
+                    await _app.Host.Try(c => c.ClearHistory(current.Id), "The history could not be cleared");
+                    await player.RefreshAsync();
+                }
+                break;
+            }
+        }
+    }
 
     private void OnToggleCoordinates(object sender, RoutedEventArgs e)
     {

@@ -46,6 +46,12 @@ public partial class App : Application
 
     public PuzzleViewModel Puzzle { get; private set; } = null!;
 
+    public PlayerViewModel Player { get; private set; } = null!;
+
+    public HistoryViewModel History { get; private set; } = null!;
+
+    public EvaluationViewModel Evaluation { get; private set; } = null!;
+
     public AccentService Accent { get; private set; } = null!;
 
     public MainWindow Window { get; private set; } = null!;
@@ -59,7 +65,18 @@ public partial class App : Application
         Host.ReportProblem = message => dispatcher.TryEnqueue(() => Status.Report(message));
         Filter = new FilterViewModel(Host, Settings, Ui.Value, dispatcher);
         Puzzle = new PuzzleViewModel(Host, Settings, Ui.Value, dispatcher);
-        Filter.CountsChanged += () => Puzzle.FilterHasMatches = Filter.HasMatches;
+        Player = new PlayerViewModel(Host, Settings);
+        History = new HistoryViewModel(Host);
+        Evaluation = new EvaluationViewModel(Host, Settings);
+        Filter.CountsChanged += () =>
+        {
+            Puzzle.FilterHasMatches = Filter.HasMatches;
+            Window?.UpdateCommands();
+        };
+        Puzzle.RatingSettled += (before, after) => Player.ShowChange(before, after);
+        Puzzle.Recorded += () => _ = OnRecordedAsync();
+        Puzzle.PositionShown += (fen, finished) => Evaluation.Show(fen, finished);
+        Player.Changed += () => _ = OnPlayerChangedAsync();
 
         Accent = new AccentService(Settings, dispatcher);
         Window = new MainWindow(this);
@@ -88,13 +105,16 @@ public partial class App : Application
     {
         try
         {
-            var core = await Task.Run(() => PuzzleCore.Create(DataDirectory));
+            var core = await Task.Run(() => PuzzleCore.Create(DataDirectory, "", Environment.UserName));
             if (_exiting)
             {
                 await Task.Run(core.Dispose);
                 return;
             }
             Host.Attach(core);
+            var rated = Settings.Value.Rated;
+            await Host.Try(c => c.SetRated(rated), "The rated setting could not be applied");
+            await Player.RefreshAsync();
             await RefreshAsync();
         }
         catch (PuzzleCoreException e)
@@ -115,6 +135,7 @@ public partial class App : Application
         try
         {
             var (status, events) = await Task.Run(() => (core.GetStatus(), core.PollEvents()));
+            await Evaluation.PollAsync();
             Status.Apply(status);
             foreach (var e in events)
             {
@@ -189,6 +210,39 @@ public partial class App : Application
         }
     }
 
+    private string _playerKey = "";
+
+    /// <summary>After a mistake, hint, solve or new puzzle: totals, history and played puzzles may have changed.</summary>
+    private async Task OnRecordedAsync()
+    {
+        await Player.RefreshAsync();
+        if (Window?.ShowingHistory == true)
+        {
+            await History.RefreshAsync();
+        }
+        if (Settings.Value.Filter.SkipPlayed)
+        {
+            await Filter.ApplyAsync();
+        }
+    }
+
+    /// <summary>A different player has their own played puzzles, rating target and history.</summary>
+    private async Task OnPlayerChangedAsync()
+    {
+        Filter.PlayerRating = Player.Rating;
+        var key = Player.Current is { } p ? $"{p.Id}" : "";
+        if (key == _playerKey)
+        {
+            return;
+        }
+        _playerKey = key;
+        await Filter.ApplyAsync();
+        if (Window?.ShowingHistory == true)
+        {
+            await History.RefreshAsync();
+        }
+    }
+
     /// <summary>A second launch signals this event to bring the window forward.</summary>
     private void ListenForShowRequests(DispatcherQueue dispatcher)
     {
@@ -215,6 +269,7 @@ public partial class App : Application
         _exiting = true;
         _timer?.Stop();
         Window.SaveLayout();
+        Evaluation.Hide();
         Settings.Save();
         Ui.Save();
         Window.AppWindow.Hide();

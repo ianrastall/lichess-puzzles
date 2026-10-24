@@ -106,7 +106,7 @@ Store format, filter fields and CLI commands are described in the [readme](../re
 
 ## Open questions
 
-- Whether a GitHub repository and public releases are wanted now.
+- Whether a GitHub repository and public releases are wanted now, and whether the installer should be signed.
 - Whether to keep the downloaded `.zst` after a successful build (needed only to rebuild without downloading again). The app keeps it by default; **Settings > Storage** turns that off.
 - Piece set licensing (above).
 
@@ -116,7 +116,35 @@ Store format, filter fields and CLI commands are described in the [readme](../re
 2. Workbench layout: regions, menus, empty/downloading/building/ready/error states, keyboard behaviour. **Done 24 October 2026:** [workbench layout](workbench-layout.md); Ian accepted its six decisions.
 3. Technical proof: Rust workspace and CLI that download, build the store and answer a filtered count against the real database, with measured build time, store size and query time. **Done 24 October 2026.**
 4. ABI and WinUI shell over that core: open the store, filter, play a puzzle to completion. **Done 24 October 2026;** see [Desktop shell](#desktop-shell-stage-4).
-5. Players and Glicko-2 ratings, history, skip played puzzles, near-my-rating selection, filter presets, export, evaluation engine, installer.
+5. Players and Glicko-2 ratings, history, skip played puzzles, near-my-rating selection, filter presets, export, evaluation engine, installer. **Done 24 October 2026;** see [Stage 5](#stage-5-ratings-history-export-evaluation-installer).
+
+## Stage 5: ratings, history, export, evaluation, installer
+
+Built 24 October 2026:
+
+- **Players and ratings** (`players.rs`, `players.sqlite`):
+  - Glicko-2 as in the predecessor (tau 0.5, deviation kept between 45 and 350, provisional above 110), one rating period per puzzle.
+  - The result is settled as on Lichess. The first wrong move, hint or solution is a loss; a solve without any of these is a win. Leaving a puzzle unfinished after playing in it is a loss.
+  - Only a player's first attempt at a puzzle is rated. Replays (Retry, or opened from History) are neither rated nor recorded.
+  - Players can be added, renamed and deleted (except the last), and their history cleared (the rating is kept).
+- **History:** every attempt is stored with its result, mistakes, hints, time and rating change. The History view sorts and filters it, shows totals and the best streak, and reopens a puzzle as a replay.
+- **Choosing puzzles:**
+  - **Skip puzzles this player has played**, using a bitset of played record indices that is rebuilt when the player or store changes.
+  - **Near my rating:** within 75 points of the player's rating plus an offset, widening to 150, 300, 600, 1,200 and then the whole range when nothing is that close.
+  - Named filter presets, kept in `settings.json`.
+- **Export** (`export.rs`):
+  - Matching puzzles or the player's played puzzles as PGN, CSV or EPD, run as a cancellable operation with a **Show file** result.
+  - **Save puzzle as PGN** and **Copy PGN** for the open puzzle.
+  - PGN keeps the predecessor's format: `Puzzle*` tags, `Source`, and the opponent's move first unless the solver's position is chosen.
+- **Evaluation engine** (`engine.rs`):
+  - Iterative-deepening alpha-beta (principal variation search), quiescence search, a transposition table, killer and history move ordering, and Michniewski's piece-square tables.
+  - It is off by default. When on, it runs on a core thread after the puzzle ends, or while solving if chosen, with a score, best line, depth and an evaluation bar.
+  - `lichess-puzzles analyse` measures it. On random puzzles it found the solution's first move in 40 of 40 at one second each; on puzzles rated 2200 and above, 33 of 40 (82%) at both one and three seconds.
+- **Installer:** `build/installer.iss` (Inno Setup 6). It installs per user to `%LOCALAPPDATA%\Programs\Jupiter\LichessPuzzles` with a **Jupiter > Lichess Puzzles** Start menu entry and an Installed apps uninstaller. Data is kept on uninstall. `build.ps1` builds it unless `-PortableOnly` is given. The installer is unsigned.
+- **Checks:**
+  - 36 Rust tests and 35 checks across the C#–Rust boundary pass.
+  - The published app started with the full store. It restored the puzzle in progress, created the first player at 1500 ± 350 (provisional) and showed the History view's empty state.
+  - Not yet exercised in the GUI: playing a rated puzzle to see the rating change, export dialogs, the evaluation display, presets, player dialogs, and running the installer. The core and interop tests cover the operations behind them.
 
 ## Desktop shell (stage 4)
 

@@ -48,6 +48,13 @@
                            SpinButtonPlacementMode="Inline" ValidationMode="InvalidInputOverwritten" ValueChanged="OnDelayChanged" MaxWidth="240" HorizontalAlignment="Left" />
                 <ToggleSwitch x:Name="AutoNextSwitch" Header="Go to the next puzzle after a clean solve" Toggled="OnAutoNextToggled" />
 
+                <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Evaluation" />
+                <ToggleSwitch x:Name="EvaluationSwitch" Header="Enable evaluation" Toggled="OnEvaluationToggled" />
+                <TextBlock Style="{StaticResource ExplanationStyle}" Margin="0,-8,0,0" Text="A small built-in engine shows a score and its best line once the puzzle ends. It is a guide, not an authority." />
+                <ToggleSwitch x:Name="EvaluationSolvingSwitch" Header="Show while solving" Toggled="OnEvaluationSolvingToggled" />
+                <NumberBox x:Name="EvaluationTimeBox" Header="Time per position (seconds)" Minimum="0.5" Maximum="5" SmallChange="0.5" LargeChange="1"
+                           SpinButtonPlacementMode="Inline" ValidationMode="InvalidInputOverwritten" ValueChanged="OnEvaluationTimeChanged" MaxWidth="240" HorizontalAlignment="Left" />
+
                 <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Storage" />
                 <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Data folder" />
                 <Grid ColumnSpacing="8">

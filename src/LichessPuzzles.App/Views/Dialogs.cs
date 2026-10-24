@@ -1,4 +1,6 @@
+using Jupiter.LichessPuzzles.App.Services;
 using Jupiter.LichessPuzzles.App.ViewModels;
+using Jupiter.LichessPuzzles.Messages;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
@@ -24,6 +26,119 @@ public static class Dialogs
         dialog.PrimaryButtonText = action;
         dialog.DefaultButton = ContentDialogButton.Close;
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    /// <summary>
+    /// Asks for a name. <paramref name="check"/> returns a note to show for the current text; with
+    /// <paramref name="blockOnWarning"/> a note also disables the primary button. Returns null when cancelled.
+    /// </summary>
+    public static async Task<string?> PromptAsync(XamlRoot root, string title, string label, string initial, string action,
+        Func<string, string?>? check = null, bool blockOnWarning = false, string? problem = null)
+    {
+        var box = new TextBox { Header = label, Text = initial, MaxLength = 40 };
+        var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Style = (Style)Application.Current.Resources["ExplanationStyle"] };
+        var panel = new StackPanel { Spacing = 8, MinWidth = 320 };
+        panel.Children.Add(box);
+        panel.Children.Add(note);
+        var dialog = Create(root, title, panel, "Cancel");
+        dialog.PrimaryButtonText = action;
+        dialog.DefaultButton = ContentDialogButton.Primary;
+        void Update()
+        {
+            var text = box.Text.Trim();
+            var warning = text.Length == 0 ? null : check?.Invoke(text);
+            note.Text = warning ?? problem ?? "";
+            note.Visibility = note.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            dialog.IsPrimaryButtonEnabled = text.Length > 0 && !(blockOnWarning && warning is not null);
+            problem = null;
+        }
+        box.TextChanged += (_, _) => Update();
+        Update();
+        dialog.Opened += (_, _) =>
+        {
+            box.Focus(FocusState.Programmatic);
+            box.SelectAll();
+        };
+        return await dialog.ShowAsync() == ContentDialogResult.Primary ? box.Text.Trim() : null;
+    }
+
+    public sealed record ExportChoice(ExportFormat Format, bool PlayerStart, string Path);
+
+    /// <summary>Format, PGN start and destination for an export; null when cancelled.</summary>
+    public static async Task<ExportChoice?> ShowExportAsync(XamlRoot root, Window owner, string title, string countText, string suggestedName, JsonStore<AppSettings> settings)
+    {
+        var formats = new RadioButtons { Header = "Format", MaxColumns = 3 };
+        formats.Items.Add("PGN");
+        formats.Items.Add("CSV");
+        formats.Items.Add("EPD");
+        formats.SelectedIndex = settings.Value.ExportFormat switch { "csv" => 1, "epd" => 2, _ => 0 };
+        var playerStart = new CheckBox { Content = "Start each game at the solver's position", IsChecked = settings.Value.ExportPlayerStart };
+        var explain = new TextBlock { Style = (Style)Application.Current.Resources["ExplanationStyle"] };
+        var path = new TextBox { Header = "File", IsReadOnly = false, PlaceholderText = "Choose where to save" };
+        var browse = new Button { Content = "Browse…", VerticalAlignment = VerticalAlignment.Bottom };
+        var pathRow = new Grid { ColumnSpacing = 8 };
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        pathRow.Children.Add(path);
+        Grid.SetColumn(browse, 1);
+        pathRow.Children.Add(browse);
+        var panel = new StackPanel { Spacing = 12, MinWidth = 420 };
+        panel.Children.Add(new TextBlock { Text = countText, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(formats);
+        panel.Children.Add(playerStart);
+        panel.Children.Add(explain);
+        panel.Children.Add(pathRow);
+        var dialog = Create(root, title, panel, "Cancel");
+        dialog.PrimaryButtonText = "Export";
+        dialog.DefaultButton = ContentDialogButton.Primary;
+
+        string Extension() => formats.SelectedIndex switch { 1 => ".csv", 2 => ".epd", _ => ".pgn" };
+        void Update()
+        {
+            playerStart.IsEnabled = formats.SelectedIndex == 0;
+            explain.Text = formats.SelectedIndex switch
+            {
+                1 => "CSV uses the Lichess columns, one puzzle per line.",
+                2 => "EPD gives the position the solver faces, with the first solution move as bm.",
+                _ => playerStart.IsChecked == true
+                    ? "Each game starts from the position the solver faces."
+                    : "Each game starts from the database position: the opponent's move comes first.",
+            };
+            if (path.Text.Length > 0 && !path.Text.EndsWith(Extension(), StringComparison.OrdinalIgnoreCase))
+            {
+                path.Text = System.IO.Path.ChangeExtension(path.Text, Extension());
+            }
+            dialog.IsPrimaryButtonEnabled = path.Text.Trim().Length > 0;
+        }
+        formats.SelectionChanged += (_, _) => Update();
+        playerStart.Click += (_, _) => Update();
+        path.TextChanged += (_, _) => dialog.IsPrimaryButtonEnabled = path.Text.Trim().Length > 0;
+        browse.Click += async (_, _) =>
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = suggestedName };
+            var (name, extension) = formats.SelectedIndex switch
+            {
+                1 => ("CSV", ".csv"),
+                2 => ("EPD", ".epd"),
+                _ => ("PGN", ".pgn"),
+            };
+            picker.FileTypeChoices.Add(name, [extension]);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(owner));
+            if (await picker.PickSaveFileAsync() is { } file)
+            {
+                path.Text = file.Path;
+            }
+        };
+        Update();
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+        var format = formats.SelectedIndex switch { 1 => ExportFormat.Csv, 2 => ExportFormat.Epd, _ => ExportFormat.Pgn };
+        settings.Value.ExportFormat = format switch { ExportFormat.Csv => "csv", ExportFormat.Epd => "epd", _ => "pgn" };
+        settings.Value.ExportPlayerStart = playerStart.IsChecked == true;
+        settings.Save();
+        return new ExportChoice(format, settings.Value.ExportPlayerStart, path.Text.Trim());
     }
 
     public static async Task ShowGoToPuzzleAsync(XamlRoot root, PuzzleViewModel puzzle)
@@ -154,6 +269,9 @@ public static class Dialogs
             ("Ctrl+Shift+H", "Show solution"),
             ("Ctrl+R", "Retry"),
             ("Ctrl+G", "Go to puzzle"),
+            ("Ctrl+1 / Ctrl+2", "Puzzle / History"),
+            ("Ctrl+E", "Export matching puzzles"),
+            ("Ctrl+S", "Save the puzzle as PGN"),
             ("Left / Right", "Back / forward one move"),
             ("Home / End", "First / latest position"),
             ("F", "Flip board"),
@@ -199,7 +317,7 @@ public static class Dialogs
         }
         Paragraph(new Run { Text = $"Lichess Puzzles {version}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }, new LineBreak(), new Run { Text = "Jupiter family · MIT licence" });
         Paragraph(new Run { Text = "Puzzles: the Lichess puzzle database, released under CC0 (database.lichess.org)." });
-        Paragraph(new Run { Text = "Chess rules: cozy-chess, MIT licence." });
+        Paragraph(new Run { Text = "Chess rules: cozy-chess, MIT licence. Evaluation: a small built-in engine using Tomasz Michniewski's simplified evaluation function." });
         Paragraph(new Run { Text = "Pieces: Merida by Armando Hernandez Marroquin, GPL version 2 or later." });
         Paragraph(new Run { Text = $"Data folder: {App.DataDirectory}" });
         await Create(root, "About Lichess Puzzles", text).ShowAsync();

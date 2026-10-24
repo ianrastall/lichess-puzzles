@@ -41,6 +41,10 @@ public sealed partial class SettingsWindow : Window
         DelayBox.Value = Math.Clamp(settings.OpponentDelayMs / 1000.0, 0.3, 2);
         AutoNextSwitch.IsOn = settings.NextAfterCleanSolve;
         DataFolderText.Text = App.DataDirectory;
+        EvaluationSwitch.IsOn = settings.EvaluationEnabled;
+        EvaluationSolvingSwitch.IsOn = settings.EvaluationWhileSolving;
+        EvaluationSolvingSwitch.IsEnabled = settings.EvaluationEnabled;
+        EvaluationTimeBox.Value = Math.Clamp(settings.EvaluationSeconds, 0.5, 5);
         KeepDownloadSwitch.IsOn = settings.KeepDownload;
         CheckUpdatesSwitch.IsOn = settings.CheckForUpdatesAtStart;
         _loading = false;
@@ -133,6 +137,36 @@ public sealed partial class SettingsWindow : Window
     {
         _app.Settings.Value.NextAfterCleanSolve = AutoNextSwitch.IsOn;
         Save();
+    }
+
+    private void OnEvaluationToggled(object sender, RoutedEventArgs e)
+    {
+        _app.Settings.Value.EvaluationEnabled = EvaluationSwitch.IsOn;
+        EvaluationSolvingSwitch.IsEnabled = EvaluationSwitch.IsOn;
+        if (!_loading)
+        {
+            _app.Settings.Save();
+            _main.ApplyEvaluationSettings();
+        }
+    }
+
+    private void OnEvaluationSolvingToggled(object sender, RoutedEventArgs e)
+    {
+        _app.Settings.Value.EvaluationWhileSolving = EvaluationSolvingSwitch.IsOn;
+        if (!_loading)
+        {
+            _app.Settings.Save();
+            _main.ApplyEvaluationSettings();
+        }
+    }
+
+    private void OnEvaluationTimeChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (!double.IsNaN(args.NewValue))
+        {
+            _app.Settings.Value.EvaluationSeconds = Math.Clamp(args.NewValue, 0.5, 5);
+            Save();
+        }
     }
 
     private void OnKeepDownloadToggled(object sender, RoutedEventArgs e)

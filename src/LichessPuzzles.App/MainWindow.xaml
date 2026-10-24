@@ -20,6 +20,18 @@
                 <MenuFlyoutItem x:Name="CheckUpdateItem" Text="Check for update" Click="OnCheckUpdate" />
                 <MenuFlyoutItem x:Name="ImportItem" Text="Import puzzle file…" Click="OnImport" />
                 <MenuFlyoutSeparator />
+                <MenuFlyoutItem x:Name="ExportMatchingItem" Text="Export matching puzzles…" Click="OnExportMatching">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="E" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="ExportPlayedItem" Text="Export played puzzles…" Click="OnExportPlayed" />
+                <MenuFlyoutItem x:Name="SavePgnItem" Text="Save puzzle as PGN…" Click="OnSavePgn">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="S" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Database details…" Click="OnDatabaseDetails" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="SettingsItem" Text="Settings" Click="OnSettings" />
@@ -32,6 +44,7 @@
                         <KeyboardAccelerator Modifiers="Control,Shift" Key="C" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="CopyPgnItem" Text="Copy PGN" Click="OnCopyPgn" />
                 <MenuFlyoutItem x:Name="CopyLinkItem" Text="Copy puzzle link" Click="OnCopyLink" />
             </MenuBarItem>
             <MenuBarItem Title="View">
@@ -40,8 +53,22 @@
                         <KeyboardAccelerator Modifiers="Control,Shift" Key="F" />
                     </ToggleMenuFlyoutItem.KeyboardAccelerators>
                 </ToggleMenuFlyoutItem>
+                <MenuFlyoutItem Text="Puzzle" Click="OnShowPuzzle">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="Number1" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="History" Click="OnShowHistory">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="Number2" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Flip board" Click="OnFlip" KeyboardAcceleratorTextOverride="F" />
                 <ToggleMenuFlyoutItem x:Name="CoordinatesItem" Text="Coordinates" Click="OnToggleCoordinates" />
+                <MenuFlyoutSeparator />
+                <ToggleMenuFlyoutItem x:Name="EvaluationItem" Text="Evaluation" Click="OnToggleEvaluation" />
+                <ToggleMenuFlyoutItem x:Name="EvaluationSolvingItem" Text="Show evaluation while solving" Click="OnToggleEvaluationSolving" />
             </MenuBarItem>
             <MenuBarItem Title="Puzzle">
                 <MenuFlyoutItem x:Name="NextItem" Text="Next puzzle" Click="OnNext">
@@ -78,6 +105,7 @@
                 <MenuFlyoutItem x:Name="OpenLichessItem" Text="Open on lichess.org" Click="OnOpenLichess" />
                 <MenuFlyoutItem x:Name="OpenGameItem" Text="Open source game" Click="OnOpenGame" />
             </MenuBarItem>
+            <MenuBarItem x:Name="PlayersMenu" Title="Players" />
             <MenuBarItem Title="Help">
                 <MenuFlyoutItem Text="Keyboard shortcuts" Click="OnShortcuts">
                     <MenuFlyoutItem.KeyboardAccelerators>
@@ -107,7 +135,23 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <board:ChessBoard x:Name="Board" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Evaluation bar: Black's share above, White's below -->
+                    <Grid x:Name="EvaluationBar" Width="12" CornerRadius="3" BorderThickness="1" Visibility="Collapsed"
+                          BorderBrush="{ThemeResource JupiterControlBoundaryBrush}" VerticalAlignment="Stretch">
+                        <Grid.RowDefinitions>
+                            <RowDefinition x:Name="BlackShareRow" Height="*" />
+                            <RowDefinition x:Name="WhiteShareRow" Height="*" />
+                        </Grid.RowDefinitions>
+                        <Rectangle Fill="#2B2824" />
+                        <Rectangle Grid.Row="1" Fill="#E8E4DC" />
+                    </Grid>
+                    <board:ChessBoard x:Name="Board" Grid.Column="1" />
+                </Grid>
                 <StackPanel x:Name="Navigation" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
                     <Button Command="{x:Bind Puzzle.FirstCommand}" IsEnabled="{x:Bind Puzzle.CanGoBack, Mode=OneWay}"
                             AutomationProperties.Name="First position" ToolTipService.ToolTip="First position (Home)">

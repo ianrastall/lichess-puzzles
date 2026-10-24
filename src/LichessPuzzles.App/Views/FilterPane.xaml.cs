@@ -30,6 +30,49 @@ public sealed partial class FilterPane : UserControl
 
     public Visibility HasText(string text) => string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
 
+    public Visibility Shown(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
+
+    private void OnPresetMenuOpening(object sender, object e)
+    {
+        var selected = !string.IsNullOrEmpty(ViewModel.SelectedPreset);
+        RenamePresetItem.IsEnabled = selected;
+        DeletePresetItem.IsEnabled = selected;
+    }
+
+    private async void OnSavePreset(object sender, RoutedEventArgs e)
+    {
+        var name = await Dialogs.PromptAsync(XamlRoot, "Save as preset", "Preset name", ViewModel.SelectedPreset ?? "", "Save preset",
+            n => ViewModel.PresetExists(n) && n != ViewModel.SelectedPreset ? "A preset with this name exists; saving replaces it." : null);
+        if (name is not null)
+        {
+            ViewModel.SavePreset(name);
+        }
+    }
+
+    private async void OnRenamePreset(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedPreset is not { } old)
+        {
+            return;
+        }
+        var name = await Dialogs.PromptAsync(XamlRoot, "Rename preset", "Preset name", old, "Rename",
+            n => ViewModel.PresetExists(n) && !string.Equals(n, old, StringComparison.CurrentCultureIgnoreCase) ? "Another preset has this name." : null,
+            blockOnWarning: true);
+        if (name is not null)
+        {
+            ViewModel.RenamePreset(old, name);
+        }
+    }
+
+    private async void OnDeletePreset(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedPreset is { } name
+            && await Dialogs.ConfirmAsync(XamlRoot, "Delete preset?", $"Delete the preset \u201C{name}\u201D? The current filters stay as they are.", "Delete preset"))
+        {
+            ViewModel.DeletePreset(name);
+        }
+    }
+
     private void OnThemeClick(object sender, ItemClickEventArgs e)
     {
         switch (e.ClickedItem)

@@ -1,0 +1,53 @@
+{
+  "project": "lichess-puzzles",
+  "status": "planning scaffold; fresh repository, no source migrated",
+  "priority": "unranked (chess-puzzles group); selected as next project 2026-10-24",
+  "track": "Windows desktop",
+  "source_candidates": [],
+  "references": [
+    {
+      "current_path": "D:\\dev\\proj\\lichess-puzzle-desktop",
+      "relationship": "predecessor implementation; feature and behaviour reference only",
+      "observed_state": "WinUI 3 / C# shell with C++20 core behind a C ABI; 24 commits on main, clean; remote https://github.com/ianrastall/lichess-puzzles.git; last commit 2026-10-05",
+      "disposition": "Keep in place. No history copied (Ian, 2026-10-24)."
+    },
+    {
+      "current_path": "D:\\GitHub\\lichess-puzzles",
+      "relationship": "dataset workspace",
+      "observed_state": "lichess_db_puzzle.csv (April 2026), themes.jsonl (theme names and descriptions), instructions.docx",
+      "disposition": "Use themes.jsonl as the theme vocabulary source; preserve folder."
+    },
+    {
+      "current_path": "D:\\GitHub\\LichessPuzzlesGui",
+      "relationship": "earlier implementation",
+      "observed_state": "WinUI starter shell (Hello World page)",
+      "disposition": "No capability to carry; preserve folder."
+    },
+    {
+      "current_path": "D:\\GitHub\\Lichess-Puzzles-Source.txt",
+      "relationship": "supporting reference",
+      "observed_state": "Concatenated source of an earlier C# puzzle model",
+      "disposition": "Preserve; reference only."
+    },
+    {
+      "current_path": "D:\\GitHub\\puzzle-nerd",
+      "relationship": "empty placeholder",
+      "observed_state": "Empty directory",
+      "disposition": "Unrelated until a scope is recorded."
+    },
+    {
+      "current_path": "D:\\jupiter\\chesscom-crawler",
+      "relationship": "stack template",
+      "observed_state": "Jupiter WinUI 3 / Rust core / C ABI / protobuf app with installer",
+      "disposition": "Reuse toolchain pins, boundary pattern, build script and installer pattern."
+    }
+  ],
+  "upstream_data": {
+    "url": "https://database.lichess.org/lichess_db_puzzle.csv.zst",
+    "checked": "2026-10-24",
+    "content_length": 307234795,
+    "last_modified": "2026-10-02T08:51:45Z",
+    "puzzles": 6157341,
+    "licence": "CC0"
+  }
+}

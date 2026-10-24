@@ -1,11 +1,14 @@
 //! Conversions between domain types and the protobuf messages.
 
 use lichess_puzzles_core::Side;
+use lichess_puzzles_core::engine::Score;
 use lichess_puzzles_core::filter::{Counts, Filter};
+use lichess_puzzles_core::players::{HistoryEntry, Player, PuzzleResult};
 use lichess_puzzles_core::service::{
-    Catalogue, CatalogueOpening, Event, EventAction, EventLevel, OperationKind, OperationStatus, Status,
+    AnalysisSnapshot, Catalogue, CatalogueOpening, Event, EventAction, EventLevel, OperationKind, OperationStatus,
+    PlayersInfo, SessionResult, Status,
 };
-use lichess_puzzles_core::session::{MoveOutcome, SessionState, SessionView};
+use lichess_puzzles_core::session::{MoveOutcome, SessionState};
 use lichess_puzzles_core::source::RemoteVersion;
 use lichess_puzzles_core::store::Puzzle;
 
@@ -65,6 +68,7 @@ fn operation(o: &OperationStatus) -> m::Operation {
             OperationKind::Download => m::OperationKind::Download,
             OperationKind::Build => m::OperationKind::Build,
             OperationKind::CheckUpdate => m::OperationKind::CheckUpdate,
+            OperationKind::Export => m::OperationKind::Export,
         } as i32,
         cancelling: o.cancelling,
         done: o.done,
@@ -144,10 +148,15 @@ fn puzzle(p: &Puzzle) -> m::Puzzle {
     }
 }
 
-pub fn session_to_message(outcome: Option<MoveOutcome>, v: &SessionView) -> m::SessionResult {
+pub fn session_to_message(r: &SessionResult) -> m::SessionResult {
     let square = |s: Option<u8>| s.map_or(-1, i32::from);
+    let v = &r.view;
     m::SessionResult {
-        outcome: match outcome {
+        rated: r.rated,
+        rating_settled: r.rating_change.is_some(),
+        rating_before: r.rating_change.map_or(0.0, |c| c.0),
+        rating_after: r.rating_change.map_or(0.0, |c| c.1),
+        outcome: match r.outcome {
             None => m::MoveOutcome::Unspecified,
             Some(MoveOutcome::Illegal) => m::MoveOutcome::Illegal,
             Some(MoveOutcome::Wrong) => m::MoveOutcome::Wrong,
@@ -207,7 +216,82 @@ pub fn event_to_message(e: &Event) -> m::Event {
             EventAction::RetryBuild => m::EventAction::RetryBuild,
             EventAction::RetryCheck => m::EventAction::RetryCheck,
             EventAction::SwitchStore => m::EventAction::SwitchStore,
+            EventAction::ShowFile => m::EventAction::ShowFile,
         } as i32,
         unix_ms: e.unix_ms as i64,
+        path: e.path.as_ref().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
     }
+}
+
+pub fn player_to_message(p: &Player) -> m::Player {
+    m::Player {
+        id: p.id,
+        name: p.name.clone(),
+        rating: p.rating.rating,
+        deviation: p.rating.deviation,
+        provisional: p.rating.provisional(),
+        games: p.games,
+        wins: p.wins,
+    }
+}
+
+pub fn players_to_message(info: &PlayersInfo) -> m::PlayerList {
+    let s = &info.stats;
+    m::PlayerList {
+        players: info.players.iter().map(player_to_message).collect(),
+        current: info.current,
+        rated: info.rated,
+        stats: Some(m::HistoryStats {
+            played: s.played,
+            solved_clean: s.solved_clean,
+            solved_with_help: s.solved_with_help,
+            failed: s.failed,
+            streak: s.streak,
+            best_streak: s.best_streak,
+            today_played: s.today_played,
+            today_solved: s.today_solved,
+        }),
+    }
+}
+
+pub fn history_to_message(entries: &[HistoryEntry]) -> m::History {
+    m::History {
+        entries: entries
+            .iter()
+            .map(|e| m::HistoryEntry {
+                id: e.id,
+                puzzle_id: e.puzzle_id.clone(),
+                played_ms: e.played_unix_ms,
+                puzzle_rating: u32::from(e.puzzle_rating),
+                result: match e.result {
+                    PuzzleResult::Solved => m::PuzzleResult::Solved,
+                    PuzzleResult::SolvedWithHelp => m::PuzzleResult::SolvedWithHelp,
+                    PuzzleResult::Failed => m::PuzzleResult::Failed,
+                } as i32,
+                mistakes: e.mistakes,
+                hints: e.hints,
+                seconds: e.seconds,
+                rated: e.rating_change.is_some(),
+                rating_before: e.rating_change.map_or(0.0, |c| c.0),
+                rating_after: e.rating_change.map_or(0.0, |c| c.1),
+            })
+            .collect(),
+    }
+}
+
+pub fn analysis_to_message(a: &AnalysisSnapshot) -> m::Analysis {
+    let mut message = m::Analysis { fen: a.fen.clone(), running: a.running, ..Default::default() };
+    if let Some(info) = &a.info {
+        message.has_result = true;
+        message.depth = info.depth;
+        match info.score {
+            Score::Centipawns(cp) => message.centipawns = cp,
+            Score::Mate(n) => message.mate = n,
+        }
+        message.pv_san = info.pv_san.clone();
+        message.pv_uci = info.pv_uci.clone();
+        message.nodes = info.nodes;
+        message.elapsed_ms = info.elapsed.as_millis().min(u32::MAX as u128) as u32;
+    }
+    message
 }

@@ -12,6 +12,8 @@ message CreateConfig {
   string data_dir = 1;
   // Empty means the Lichess puzzle database URL.
   string source_url = 2;
+  // Name of the first player in a new player database; empty means "Player".
+  string default_player = 3;
 }
 
 message Request {
@@ -29,6 +31,19 @@ message Request {
     PauseDownload pause_download = 23;
     CancelOperation cancel_operation = 24;
     SwitchStore switch_store = 25;
+    GetPlayers get_players = 30;
+    SetCurrentPlayer set_current_player = 31;
+    AddPlayer add_player = 32;
+    RenamePlayer rename_player = 33;
+    DeletePlayer delete_player = 34;
+    ClearHistory clear_history = 35;
+    SetRated set_rated = 36;
+    GetHistory get_history = 37;
+    GetPuzzlePgn get_puzzle_pgn = 40;
+    StartExport start_export = 41;
+    StartAnalysis start_analysis = 50;
+    GetAnalysis get_analysis = 51;
+    StopAnalysis stop_analysis = 52;
   }
 }
 
@@ -36,9 +51,15 @@ message GetStatus {}
 message GetCatalogue {}
 message SetFilter {
   Filter filter = 1;
+  // Leave out the current player's played puzzles.
+  bool skip_played = 2;
 }
 // Starts a random puzzle matching the current filter.
-message NextPuzzle {}
+message NextPuzzle {
+  // Choose near the current player's rating plus offset, widening the window when needed.
+  bool near_rating = 1;
+  sint32 offset = 2;
+}
 message LoadPuzzle {
   // Puzzle id or lichess.org training link.
   string id = 1;
@@ -70,6 +91,58 @@ message CheckForUpdate {}
 message PauseDownload {}
 message CancelOperation {}
 message SwitchStore {}
+message GetPlayers {
+  // Start of today in milliseconds since the Unix epoch, for today's totals.
+  int64 day_start_ms = 1;
+}
+message SetCurrentPlayer {
+  int64 id = 1;
+}
+message AddPlayer {
+  string name = 1;
+}
+message RenamePlayer {
+  int64 id = 1;
+  string name = 2;
+}
+message DeletePlayer {
+  int64 id = 1;
+}
+message ClearHistory {
+  int64 id = 1;
+}
+// Whether puzzles started from now on are rated.
+message SetRated {
+  bool rated = 1;
+}
+// The current player's history, newest first.
+message GetHistory {
+  uint32 limit = 1;
+}
+message GetPuzzlePgn {
+  bool player_start = 1;
+}
+enum ExportSource {
+  EXPORT_SOURCE_MATCHING = 0;
+  EXPORT_SOURCE_PLAYED = 1;
+}
+enum ExportFormat {
+  EXPORT_FORMAT_PGN = 0;
+  EXPORT_FORMAT_CSV = 1;
+  EXPORT_FORMAT_EPD = 2;
+}
+message StartExport {
+  ExportSource source = 1;
+  ExportFormat format = 2;
+  bool player_start = 3;
+  string path = 4;
+}
+message StartAnalysis {
+  string fen = 1;
+  uint32 millis = 2;
+}
+message GetAnalysis {}
+message StopAnalysis {}
 
 message Response {
   uint64 request_id = 1;
@@ -80,7 +153,89 @@ message Response {
     SessionResult session = 13;
     Done done = 14;
     Error error = 15;
+    PlayerList players = 16;
+    Player player = 17;
+    History history = 18;
+    Text text = 19;
+    Started started = 20;
+    Analysis analysis = 21;
   }
+}
+
+message Text {
+  string text = 1;
+}
+
+message Started {
+  // Items the operation will process.
+  uint64 count = 1;
+}
+
+message Player {
+  int64 id = 1;
+  string name = 2;
+  double rating = 3;
+  double deviation = 4;
+  bool provisional = 5;
+  uint32 games = 6;
+  uint32 wins = 7;
+}
+
+message HistoryStats {
+  uint32 played = 1;
+  uint32 solved_clean = 2;
+  uint32 solved_with_help = 3;
+  uint32 failed = 4;
+  uint32 streak = 5;
+  uint32 best_streak = 6;
+  uint32 today_played = 7;
+  uint32 today_solved = 8;
+}
+
+message PlayerList {
+  repeated Player players = 1;
+  int64 current = 2;
+  HistoryStats stats = 3;
+  bool rated = 4;
+}
+
+enum PuzzleResult {
+  PUZZLE_RESULT_SOLVED = 0;
+  PUZZLE_RESULT_SOLVED_WITH_HELP = 1;
+  PUZZLE_RESULT_FAILED = 2;
+}
+
+message HistoryEntry {
+  int64 id = 1;
+  string puzzle_id = 2;
+  int64 played_ms = 3;
+  uint32 puzzle_rating = 4;
+  PuzzleResult result = 5;
+  uint32 mistakes = 6;
+  uint32 hints = 7;
+  double seconds = 8;
+  bool rated = 9;
+  double rating_before = 10;
+  double rating_after = 11;
+}
+
+message History {
+  repeated HistoryEntry entries = 1;
+}
+
+message Analysis {
+  string fen = 1;
+  bool running = 2;
+  bool has_result = 3;
+  uint32 depth = 4;
+  // Centipawns from White's side, unless mate is non-zero.
+  sint32 centipawns = 5;
+  // Mate in this many moves; negative when Black mates.
+  sint32 mate = 6;
+  repeated string pv_san = 7;
+  repeated string pv_uci = 8;
+  uint64 nodes = 9;
+  uint32 elapsed_ms = 10;
 }
 
 message Done {}
@@ -95,6 +250,8 @@ enum ErrorKind {
   ERROR_KIND_STATE = 6;
   ERROR_KIND_IO = 7;
   ERROR_KIND_UNKNOWN_COMMAND = 8;
+  // An invalid or duplicate player name, the last player, or a player database error.
+  ERROR_KIND_PLAYER = 9;
 }
 
 message Error {
@@ -160,6 +317,7 @@ enum OperationKind {
   OPERATION_KIND_DOWNLOAD = 1;
   OPERATION_KIND_BUILD = 2;
   OPERATION_KIND_CHECK_UPDATE = 3;
+  OPERATION_KIND_EXPORT = 4;
 }
 
 message Operation {
@@ -280,6 +438,12 @@ message SessionResult {
   // Unspecified unless the command was a move.
   MoveOutcome outcome = 1;
   SessionView view = 2;
+  // The attempt counts toward the current player's rating.
+  bool rated = 3;
+  // Set once the rated result is decided.
+  bool rating_settled = 4;
+  double rating_before = 5;
+  double rating_after = 6;
 }
 
 enum EventLevel {
@@ -295,6 +459,7 @@ enum EventAction {
   EVENT_ACTION_RETRY_BUILD = 2;
   EVENT_ACTION_RETRY_CHECK = 3;
   EVENT_ACTION_SWITCH_STORE = 4;
+  EVENT_ACTION_SHOW_FILE = 5;
 }
 
 message Event {
@@ -302,6 +467,8 @@ message Event {
   string message = 2;
   EventAction action = 3;
   int64 unix_ms = 4;
+  // The file for EVENT_ACTION_SHOW_FILE.
+  string path = 5;
 }
 
 message EventBatch {

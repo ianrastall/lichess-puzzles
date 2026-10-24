@@ -14,6 +14,7 @@ public enum PuzzleErrorKind
     State,
     Io,
     UnknownCommand,
+    Player,
 }
 
 public sealed class PuzzleCoreException(PuzzleErrorKind kind, string message) : Exception(message)
@@ -31,6 +32,7 @@ public sealed class PuzzleCoreException(PuzzleErrorKind kind, string message) : 
             ErrorKind.State => PuzzleErrorKind.State,
             ErrorKind.Io => PuzzleErrorKind.Io,
             ErrorKind.UnknownCommand => PuzzleErrorKind.UnknownCommand,
+            ErrorKind.Player => PuzzleErrorKind.Player,
             _ => PuzzleErrorKind.State,
         },
         error.Message);
@@ -50,7 +52,8 @@ public sealed class PuzzleCore : IDisposable
 
     /// <summary>Loads the native core, checks its ABI version and opens the data folder.</summary>
     /// <param name="sourceUrl">Download URL; empty for the Lichess puzzle database.</param>
-    public static unsafe PuzzleCore Create(string dataDir, string sourceUrl = "")
+    /// <param name="defaultPlayer">Name of the first player in a new player database.</param>
+    public static unsafe PuzzleCore Create(string dataDir, string sourceUrl = "", string defaultPlayer = "")
     {
         uint version;
         try
@@ -66,7 +69,7 @@ public sealed class PuzzleCore : IDisposable
             throw new PuzzleCoreException(PuzzleErrorKind.Transport, $"The puzzle core has ABI version {version}; this app needs {NativeMethods.AbiVersion}.");
         }
 
-        var config = new CreateConfig { DataDir = dataDir, SourceUrl = sourceUrl }.ToByteArray();
+        var config = new CreateConfig { DataDir = dataDir, SourceUrl = sourceUrl, DefaultPlayer = defaultPlayer }.ToByteArray();
         NativeStatus status;
         CoreSafeHandle core;
         ResultSafeHandle error;
@@ -123,10 +126,12 @@ public sealed class PuzzleCore : IDisposable
     public Catalogue GetCatalogue() => Call(new Request { GetCatalogue = new GetCatalogue() }).Catalogue;
 
     /// <summary>Replaces the current filter; returns the matching counts.</summary>
-    public Counts SetFilter(Filter filter) => Call(new Request { SetFilter = new SetFilter { Filter = filter } }).Counts;
+    public Counts SetFilter(Filter filter, bool skipPlayed = false) =>
+        Call(new Request { SetFilter = new SetFilter { Filter = filter, SkipPlayed = skipPlayed } }).Counts;
 
-    /// <summary>Starts a random puzzle matching the current filter.</summary>
-    public SessionResult NextPuzzle() => Call(new Request { NextPuzzle = new NextPuzzle() }).Session;
+    /// <summary>Starts a random puzzle matching the current filter, optionally near the player's rating plus an offset.</summary>
+    public SessionResult NextPuzzle(bool nearRating = false, int offset = 0) =>
+        Call(new Request { NextPuzzle = new NextPuzzle { NearRating = nearRating, Offset = offset } }).Session;
 
     /// <summary>Starts a puzzle by id or lichess.org training link.</summary>
     public SessionResult LoadPuzzle(string id, bool replay = false) =>
@@ -162,6 +167,42 @@ public sealed class PuzzleCore : IDisposable
     public void CancelOperation() => Call(new Request { CancelOperation = new CancelOperation() });
 
     public void SwitchStore() => Call(new Request { SwitchStore = new SwitchStore() });
+
+    /// <summary>Players, the current player and their totals; <paramref name="dayStart"/> starts "today".</summary>
+    public PlayerList GetPlayers(DateTimeOffset dayStart) =>
+        Call(new Request { GetPlayers = new GetPlayers { DayStartMs = dayStart.ToUnixTimeMilliseconds() } }).Players;
+
+    public void SetCurrentPlayer(long id) => Call(new Request { SetCurrentPlayer = new SetCurrentPlayer { Id = id } });
+
+    public Player AddPlayer(string name) => Call(new Request { AddPlayer = new AddPlayer { Name = name } }).Player;
+
+    public Player RenamePlayer(long id, string name) =>
+        Call(new Request { RenamePlayer = new RenamePlayer { Id = id, Name = name } }).Player;
+
+    public void DeletePlayer(long id) => Call(new Request { DeletePlayer = new DeletePlayer { Id = id } });
+
+    public void ClearHistory(long id) => Call(new Request { ClearHistory = new ClearHistory { Id = id } });
+
+    /// <summary>Whether puzzles started from now on are rated.</summary>
+    public void SetRated(bool rated) => Call(new Request { SetRated = new SetRated { Rated = rated } });
+
+    /// <summary>The current player's history, newest first; 0 means all.</summary>
+    public IReadOnlyList<HistoryEntry> GetHistory(uint limit = 0) =>
+        Call(new Request { GetHistory = new GetHistory { Limit = limit } }).History.Entries;
+
+    public string GetPuzzlePgn(bool playerStart) =>
+        Call(new Request { GetPuzzlePgn = new GetPuzzlePgn { PlayerStart = playerStart } }).Text.Text_;
+
+    /// <summary>Starts writing puzzles to <paramref name="path"/>; returns how many will be written.</summary>
+    public ulong StartExport(ExportSource source, ExportFormat format, bool playerStart, string path) =>
+        Call(new Request { StartExport = new StartExport { Source = source, Format = format, PlayerStart = playerStart, Path = path } }).Started.Count;
+
+    public void StartAnalysis(string fen, TimeSpan limit) =>
+        Call(new Request { StartAnalysis = new StartAnalysis { Fen = fen, Millis = (uint)Math.Clamp(limit.TotalMilliseconds, 100, 60000) } });
+
+    public Analysis GetAnalysis() => Call(new Request { GetAnalysis = new GetAnalysis() }).Analysis;
+
+    public void StopAnalysis() => Call(new Request { StopAnalysis = new StopAnalysis() });
 
     public IReadOnlyList<Event> PollEvents(uint max = 100)
     {

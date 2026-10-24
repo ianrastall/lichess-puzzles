@@ -6,6 +6,12 @@
 //!
 //! Stores are built to `puzzles-next.store` and moved to `puzzles.store` by `switch_store`, which
 //! first closes the open store (Windows cannot replace a mapped file).
+//!
+//! Players, ratings, history, export and analysis are in `service/practice.rs`.
+
+mod practice;
+
+pub use practice::{AnalysisSnapshot, ExportSource, PlayersInfo, SessionResult};
 
 use std::collections::VecDeque;
 use std::fs;
@@ -17,8 +23,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::build::{BuildOptions, build_store};
 use crate::catalogue::{self, OTHER_GROUP};
-use crate::filter::{self, Counts, Filter, FilterError};
-use crate::session::{MoveOutcome, Session, SessionError, SessionView};
+use crate::filter::{self, Filter, FilterError};
+use crate::players::{PlayerError, PlayerStore};
+use crate::session::SessionError;
 use crate::source::{DownloadOutcome, RemoteVersion, Source, UpdateCheck};
 use crate::store::{SourceInfo, Store, StoreError};
 use crate::{STORE_FILE, puzzle_id};
@@ -30,6 +37,8 @@ const MAX_EVENTS: usize = 200;
 pub struct ServiceConfig {
     pub data_dir: PathBuf,
     pub source_url: String,
+    /// Name of the player created with a new player database.
+    pub default_player: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +52,7 @@ pub enum ServiceError {
     Filter(FilterError),
     Session(SessionError),
     Store(StoreError),
+    Player(PlayerError),
     Io(String),
 }
 
@@ -56,6 +66,7 @@ impl std::fmt::Display for ServiceError {
             ServiceError::Filter(e) => e.fmt(f),
             ServiceError::Session(e) => e.fmt(f),
             ServiceError::Store(e) => e.fmt(f),
+            ServiceError::Player(e) => e.fmt(f),
             ServiceError::Io(message) => f.write_str(message),
         }
     }
@@ -79,6 +90,8 @@ pub enum EventAction {
     RetryBuild,
     RetryCheck,
     SwitchStore,
+    /// Show the file named by the event's path.
+    ShowFile,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +100,7 @@ pub struct Event {
     pub message: String,
     pub action: EventAction,
     pub unix_ms: u64,
+    pub path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,13 +108,14 @@ pub enum OperationKind {
     Download,
     Build,
     CheckUpdate,
+    Export,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OperationStatus {
     pub kind: OperationKind,
     pub cancelling: bool,
-    /// Bytes downloaded or input bytes read.
+    /// Bytes downloaded, input bytes read or puzzles exported.
     pub done: u64,
     pub total: Option<u64>,
     /// Bytes per second while downloading.
@@ -211,7 +226,13 @@ struct Inner {
     store: RwLock<Option<OpenStore>>,
     store_problem: Mutex<Option<String>>,
     filter: Mutex<Filter>,
-    session: Mutex<Option<Session>>,
+    skip_played: AtomicBool,
+    session: Mutex<Option<practice::Active>>,
+    players: Mutex<PlayerStore>,
+    /// The current player's played puzzles as record indices of the open store.
+    played: Mutex<Option<(i64, Arc<Vec<u64>>)>>,
+    rated: AtomicBool,
+    analysis: Mutex<practice::AnalysisState>,
     operation: Mutex<Option<Operation>>,
     next_operation: AtomicU64,
     events: Mutex<VecDeque<Event>>,
@@ -230,13 +251,20 @@ impl Service {
         fs::create_dir_all(&config.data_dir)
             .map_err(|e| ServiceError::Io(format!("{}: {e}", config.data_dir.display())))?;
         let seed = SystemTime::now().duration_since(UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
+        let players = PlayerStore::open(&config.data_dir.join("players.sqlite"), &config.default_player)
+            .map_err(ServiceError::Player)?;
         let inner = Arc::new(Inner {
             source: Source::new(config.data_dir.join("source"), config.source_url),
             data_dir: config.data_dir,
             store: RwLock::new(None),
             store_problem: Mutex::new(None),
             filter: Mutex::new(Filter::default()),
+            skip_played: AtomicBool::new(false),
             session: Mutex::new(None),
+            players: Mutex::new(players),
+            played: Mutex::new(None),
+            rated: AtomicBool::new(true),
+            analysis: Mutex::new(practice::AnalysisState::default()),
             operation: Mutex::new(None),
             next_operation: AtomicU64::new(1),
             events: Mutex::new(VecDeque::new()),
@@ -351,73 +379,6 @@ impl Service {
         Ok(Catalogue { themes, groups, families, variations, rating_min, rating_max })
     }
 
-    /// Replaces the current filter and returns its counts. An invalid filter is not kept.
-    pub fn set_filter(&self, filter: Filter) -> Result<Counts, ServiceError> {
-        let store = self.store()?;
-        let compiled = filter.compile(&store).map_err(ServiceError::Filter)?;
-        let counts = filter::counts(&store, &compiled);
-        *self.inner.filter.lock().unwrap() = filter;
-        Ok(counts)
-    }
-
-    /// Starts a random puzzle matching the current filter.
-    pub fn next_puzzle(&self) -> Result<SessionView, ServiceError> {
-        let store = self.store()?;
-        let filter = self.inner.filter.lock().unwrap().clone();
-        let compiled = filter.compile(&store).map_err(ServiceError::Filter)?;
-        let seed = self.inner.seed.fetch_add(0x9E37_79B9_7F4A_7C15, Ordering::Relaxed);
-        let index = filter::pick(&store, &compiled, seed).ok_or(ServiceError::NoMatches)?;
-        self.start_session(&store, index, false)
-    }
-
-    /// Starts a puzzle by id or lichess.org training link.
-    pub fn load_puzzle(&self, id_or_link: &str, replay: bool) -> Result<SessionView, ServiceError> {
-        let store = self.store()?;
-        let id = puzzle_id_from(id_or_link);
-        let index = store.find(&id).ok_or_else(|| ServiceError::NotFound(id.clone()))?;
-        self.start_session(&store, index, replay)
-    }
-
-    fn start_session(&self, store: &Store, index: usize, replay: bool) -> Result<SessionView, ServiceError> {
-        let puzzle = store.puzzle(index).map_err(ServiceError::Store)?;
-        let mut session = Session::new(puzzle).map_err(ServiceError::Session)?;
-        session.set_replay(replay);
-        let view = session.view();
-        *self.inner.session.lock().unwrap() = Some(session);
-        Ok(view)
-    }
-
-    /// Applies a command to the current session. A move also returns its outcome.
-    pub fn session(&self, command: SessionCommand) -> Result<(Option<MoveOutcome>, SessionView), ServiceError> {
-        let mut guard = self.inner.session.lock().unwrap();
-        let session = guard.as_mut().ok_or(ServiceError::Session(SessionError::State("no puzzle is open")))?;
-        let outcome = match command {
-            SessionCommand::Get => None,
-            SessionCommand::PlayOpponent => {
-                session.play_opponent().map_err(ServiceError::Session)?;
-                None
-            }
-            SessionCommand::MakeMove(uci) => Some(session.make_move(&uci).map_err(ServiceError::Session)?),
-            SessionCommand::Hint => {
-                session.hint().map_err(ServiceError::Session)?;
-                None
-            }
-            SessionCommand::ShowSolution => {
-                session.show_solution().map_err(ServiceError::Session)?;
-                None
-            }
-            SessionCommand::Retry => {
-                session.retry();
-                None
-            }
-            SessionCommand::Navigate(ply) => {
-                session.navigate(ply);
-                None
-            }
-        };
-        Ok((outcome, session.view()))
-    }
-
     /// Downloads the puzzle database (resuming a paused download) and builds a store from it.
     pub fn start_download(&self, keep_download: bool) -> Result<(), ServiceError> {
         self.start_operation(OperationKind::Download, move |inner, op| inner.download_and_build(op, keep_download))
@@ -469,6 +430,7 @@ impl Service {
 
     /// Cancels the running operation, keeping a partial download, and waits for it to stop.
     pub fn shutdown(&self) {
+        self.stop_analysis();
         let op = self.inner.operation.lock().unwrap().take();
         if let Some(mut op) = op {
             op.cancel.store(true, Ordering::Relaxed);
@@ -562,7 +524,14 @@ impl Inner {
         if events.len() == MAX_EVENTS {
             events.pop_front();
         }
-        events.push_back(Event { level, message: message.into(), action, unix_ms });
+        events.push_back(Event { level, message: message.into(), action, unix_ms, path: None });
+    }
+
+    fn event_with_path(&self, level: EventLevel, message: impl Into<String>, action: EventAction, path: PathBuf) {
+        self.event(level, message, action);
+        if let Some(last) = self.events.lock().unwrap().back_mut() {
+            last.path = Some(path);
+        }
     }
 
     /// Opens `puzzles.store`, recording why when it cannot be opened.
@@ -763,6 +732,8 @@ impl Inner {
         let opened = open.is_some();
         *guard = open;
         drop(guard);
+        // Played puzzles are kept as record indices, which differ between stores.
+        *self.played.lock().unwrap() = None;
         *self.store_problem.lock().unwrap() = problem;
         let mut update = self.update.lock().unwrap();
         update.ready = false;

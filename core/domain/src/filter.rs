@@ -1,6 +1,8 @@
 //! Puzzle filters, compiled against a store's theme and opening tables and run as a parallel scan
 //! over its records.
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::Side;
@@ -58,6 +60,17 @@ pub struct CompiledFilter {
     openings: Option<(Vec<bool>, Vec<bool>)>,
     solver_white: Option<bool>,
     moves: (u8, u8),
+    /// Record indices to leave out (bit i of word i / 64), such as puzzles already played.
+    excluded: Option<Arc<Vec<u64>>>,
+}
+
+/// A set of record indices, for excluding played puzzles.
+pub fn index_set(len: usize, indices: impl IntoIterator<Item = usize>) -> Arc<Vec<u64>> {
+    let mut bits = vec![0u64; len.div_ceil(64)];
+    for i in indices.into_iter().filter(|&i| i < len) {
+        bits[i / 64] |= 1 << (i % 64);
+    }
+    Arc::new(bits)
 }
 
 impl Filter {
@@ -103,11 +116,34 @@ impl Filter {
                 self.min_solution_moves.unwrap_or(0).saturating_mul(2),
                 self.max_solution_moves.unwrap_or(u8::MAX / 2).saturating_mul(2),
             ),
+            excluded: None,
         })
     }
 }
 
 impl CompiledFilter {
+    /// Leaves out the record indices in `set` (from `index_set`).
+    pub fn excluding(mut self, set: Arc<Vec<u64>>) -> CompiledFilter {
+        self.excluded = Some(set);
+        self
+    }
+
+    /// Narrows the rating bounds to `low..=high` as well.
+    pub fn within_ratings(&self, low: u16, high: u16) -> CompiledFilter {
+        let mut narrowed = self.clone();
+        narrowed.rating = (self.rating.0.max(low), self.rating.1.min(high));
+        narrowed
+    }
+
+    fn excludes(&self, index: usize) -> bool {
+        self.excluded.as_ref().is_some_and(|bits| bits.get(index / 64).is_some_and(|w| w >> (index % 64) & 1 == 1))
+    }
+
+    /// Whether the record at `index` passes the filter.
+    pub fn accepts(&self, index: usize, r: &Record) -> bool {
+        self.matches(r) && !self.excludes(index)
+    }
+
     pub fn matches(&self, r: &Record) -> bool {
         r.rating >= self.rating.0
             && r.rating <= self.rating.1
@@ -148,8 +184,14 @@ fn scan<T: Send>(store: &Store, per_chunk: impl Fn(usize, &[u8]) -> T + Sync) ->
 }
 
 pub fn count(store: &Store, filter: &CompiledFilter) -> usize {
-    scan(store, |_, chunk| {
-        chunk.as_chunks::<RECORD_SIZE>().0.iter().filter(|r| filter.matches(&Record::decode(r))).count()
+    scan(store, |start, chunk| {
+        chunk
+            .as_chunks::<RECORD_SIZE>()
+            .0
+            .iter()
+            .enumerate()
+            .filter(|(i, r)| filter.accepts(start + i, &Record::decode(r)))
+            .count()
     })
     .into_iter()
     .sum()
@@ -163,7 +205,7 @@ pub fn matching(store: &Store, filter: &CompiledFilter) -> Vec<u32> {
             .0
             .iter()
             .enumerate()
-            .filter(|(_, r)| filter.matches(&Record::decode(r)))
+            .filter(|(i, r)| filter.accepts(start + i, &Record::decode(r)))
             .map(|(i, _)| (start + i) as u32)
             .collect::<Vec<_>>()
     })
@@ -207,11 +249,11 @@ impl Counts {
 
 /// Counts for showing beside theme and opening choices.
 pub fn counts(store: &Store, filter: &CompiledFilter) -> Counts {
-    scan(store, |_, chunk| {
+    scan(store, |start, chunk| {
         let mut counts = Counts::new(store);
-        for r in chunk.as_chunks::<RECORD_SIZE>().0 {
+        for (i, r) in chunk.as_chunks::<RECORD_SIZE>().0.iter().enumerate() {
             let record = Record::decode(r);
-            if filter.matches(&record) {
+            if filter.accepts(start + i, &record) {
                 counts.total += 1;
                 counts.families[record.family as usize] += 1;
                 counts.variations[record.variation as usize] += 1;
@@ -231,7 +273,13 @@ pub fn counts(store: &Store, filter: &CompiledFilter) -> Counts {
 /// One matching puzzle chosen uniformly at random from `seed`, without collecting every match.
 pub fn pick(store: &Store, filter: &CompiledFilter, seed: u64) -> Option<usize> {
     let per_chunk = scan(store, |start, chunk| {
-        let n = chunk.as_chunks::<RECORD_SIZE>().0.iter().filter(|r| filter.matches(&Record::decode(r))).count();
+        let n = chunk
+            .as_chunks::<RECORD_SIZE>()
+            .0
+            .iter()
+            .enumerate()
+            .filter(|(i, r)| filter.accepts(start + i, &Record::decode(r)))
+            .count();
         (start, chunk.len() / RECORD_SIZE, n)
     });
     let total: usize = per_chunk.iter().map(|c| c.2).sum();
@@ -241,9 +289,22 @@ pub fn pick(store: &Store, filter: &CompiledFilter, seed: u64) -> Option<usize> 
     let mut target = (SplitMix64(seed).next() % total as u64) as usize;
     for (start, len, n) in per_chunk {
         if target < n {
-            return (start..start + len).filter(|&i| filter.matches(&store.record(i))).nth(target);
+            return (start..start + len).filter(|&i| filter.accepts(i, &store.record(i))).nth(target);
         }
         target -= n;
+    }
+    None
+}
+
+/// A matching puzzle rated within 75 points of `target`, widening the window step by step when
+/// none is that close. Returns the puzzle and the window used.
+pub fn pick_near(store: &Store, filter: &CompiledFilter, target: i32, seed: u64) -> Option<(usize, u16)> {
+    for window in [75, 150, 300, 600, 1200, 4000] {
+        let low = (target - window).clamp(0, u16::MAX as i32) as u16;
+        let high = (target + window).clamp(0, u16::MAX as i32) as u16;
+        if let Some(index) = pick(store, &filter.within_ratings(low, high), seed) {
+            return Some((index, window as u16));
+        }
     }
     None
 }

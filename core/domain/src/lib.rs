@@ -4,7 +4,10 @@
 pub mod build;
 pub mod catalogue;
 pub mod chess;
+pub mod engine;
+pub mod export;
 pub mod filter;
+pub mod players;
 pub mod puzzle_id;
 pub mod service;
 pub mod session;

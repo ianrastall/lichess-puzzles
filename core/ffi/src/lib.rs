@@ -27,7 +27,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use lichess_puzzles_core::service::{Service, ServiceConfig, ServiceError, SessionCommand};
+use lichess_puzzles_core::export::ExportFormat;
+use lichess_puzzles_core::service::{ExportSource, Service, ServiceConfig, ServiceError, SessionCommand};
 use lichess_puzzles_core::source::PUZZLE_URL;
 use prost::Message;
 
@@ -71,6 +72,7 @@ fn service_error(request_id: u64, e: ServiceError) -> messages::Response {
         ServiceError::Filter(_) => ErrorKind::InvalidFilter,
         ServiceError::Session(_) => ErrorKind::State,
         ServiceError::Store(_) | ServiceError::Io(_) => ErrorKind::Io,
+        ServiceError::Player(_) => ErrorKind::Player,
     };
     error_response(request_id, kind, e.to_string())
 }
@@ -100,7 +102,11 @@ pub fn dispatch(service: &Service, req: messages::Request) -> messages::Response
         Err(e) => service_error(id, e),
     };
     let session = |r: Result<_, ServiceError>| match r {
-        Ok((outcome, view)) => ok(response::Result::Session(convert::session_to_message(outcome, &view))),
+        Ok(result) => ok(response::Result::Session(convert::session_to_message(&result))),
+        Err(e) => service_error(id, e),
+    };
+    let player = |r: Result<_, ServiceError>| match r {
+        Ok(p) => ok(response::Result::Player(convert::player_to_message(&p))),
         Err(e) => service_error(id, e),
     };
     use request::Command as C;
@@ -112,13 +118,13 @@ pub fn dispatch(service: &Service, req: messages::Request) -> messages::Response
         },
         Some(C::SetFilter(f)) => {
             let filter = convert::filter_from_message(&f.filter.unwrap_or_default());
-            match service.set_filter(filter) {
+            match service.set_filter(filter, f.skip_played) {
                 Ok(counts) => ok(response::Result::Counts(convert::counts_to_message(&counts))),
                 Err(e) => service_error(id, e),
             }
         }
-        Some(C::NextPuzzle(_)) => session(service.next_puzzle().map(|v| (None, v))),
-        Some(C::LoadPuzzle(p)) => session(service.load_puzzle(&p.id, p.replay).map(|v| (None, v))),
+        Some(C::NextPuzzle(n)) => session(service.next_puzzle(n.near_rating.then_some(n.offset))),
+        Some(C::LoadPuzzle(p)) => session(service.load_puzzle(&p.id, p.replay)),
         Some(C::Session(s)) => {
             let command = match s.command {
                 Some(session_command::Command::Get(_)) => SessionCommand::Get,
@@ -147,6 +153,54 @@ pub fn dispatch(service: &Service, req: messages::Request) -> messages::Response
             done()
         }
         Some(C::SwitchStore(_)) => finish(service.switch_store()),
+        Some(C::GetPlayers(g)) => match service.players(g.day_start_ms) {
+            Ok(info) => ok(response::Result::Players(convert::players_to_message(&info))),
+            Err(e) => service_error(id, e),
+        },
+        Some(C::SetCurrentPlayer(p)) => finish(service.set_current_player(p.id)),
+        Some(C::AddPlayer(p)) => player(service.add_player(&p.name)),
+        Some(C::RenamePlayer(p)) => player(service.rename_player(p.id, &p.name)),
+        Some(C::DeletePlayer(p)) => finish(service.delete_player(p.id)),
+        Some(C::ClearHistory(p)) => finish(service.clear_history(p.id).map(|_| ())),
+        Some(C::SetRated(r)) => {
+            service.set_rated(r.rated);
+            done()
+        }
+        Some(C::GetHistory(h)) => match service.history(if h.limit == 0 { 100_000 } else { h.limit as usize }) {
+            Ok(entries) => ok(response::Result::History(convert::history_to_message(&entries))),
+            Err(e) => service_error(id, e),
+        },
+        Some(C::GetPuzzlePgn(p)) => match service.puzzle_pgn(p.player_start) {
+            Ok(text) => ok(response::Result::Text(messages::Text { text })),
+            Err(e) => service_error(id, e),
+        },
+        Some(C::StartExport(x)) => {
+            let source = match messages::ExportSource::try_from(x.source) {
+                Ok(messages::ExportSource::Played) => ExportSource::Played,
+                _ => ExportSource::Matching,
+            };
+            let format = match messages::ExportFormat::try_from(x.format) {
+                Ok(messages::ExportFormat::Csv) => ExportFormat::Csv,
+                Ok(messages::ExportFormat::Epd) => ExportFormat::Epd,
+                _ => ExportFormat::Pgn,
+            };
+            if x.path.is_empty() {
+                return error_response(id, ErrorKind::Io, "No export file was given.");
+            }
+            match service.start_export(source, format, x.player_start, PathBuf::from(x.path)) {
+                Ok(count) => ok(response::Result::Started(messages::Started { count })),
+                Err(e) => service_error(id, e),
+            }
+        }
+        Some(C::StartAnalysis(a)) => {
+            let millis = u64::from(a.millis.clamp(100, 60_000));
+            finish(service.start_analysis(&a.fen, std::time::Duration::from_millis(millis)))
+        }
+        Some(C::GetAnalysis(_)) => ok(response::Result::Analysis(convert::analysis_to_message(&service.analysis()))),
+        Some(C::StopAnalysis(_)) => {
+            service.stop_analysis();
+            done()
+        }
         None => error_response(id, ErrorKind::UnknownCommand, "Unknown or missing command."),
     }
 }
@@ -188,8 +242,10 @@ pub unsafe extern "C" fn lpz_create(
             ));
         }
         let source_url = if config.source_url.is_empty() { PUZZLE_URL.to_owned() } else { config.source_url };
-        let service = Service::open(ServiceConfig { data_dir: PathBuf::from(config.data_dir), source_url })
-            .map_err(|e| (LPZ_CREATE_FAILED, Some(Box::new(service_error(0, e)))))?;
+        let default_player = if config.default_player.is_empty() { "Player".to_owned() } else { config.default_player };
+        let service =
+            Service::open(ServiceConfig { data_dir: PathBuf::from(config.data_dir), source_url, default_player })
+                .map_err(|e| (LPZ_CREATE_FAILED, Some(Box::new(service_error(0, e)))))?;
         Ok(Box::into_raw(Box::new(CoreHandle { service, poisoned: AtomicBool::new(false) })))
     });
     match outcome {
@@ -369,6 +425,7 @@ mod tests {
         let config = messages::CreateConfig {
             data_dir: dir.path().to_string_lossy().into(),
             source_url: "http://127.0.0.1:9/unused".into(),
+            default_player: "Tester".into(),
         }
         .encode_to_vec();
         let mut core = std::ptr::null_mut();
@@ -402,7 +459,8 @@ mod tests {
         assert_eq!(catalogue.themes.len(), 19);
 
         let filter = messages::Filter { themes_any: vec!["mate".into()], ..Default::default() };
-        let resp = call(core, request::Command::SetFilter(messages::SetFilter { filter: Some(filter) }));
+        let resp =
+            call(core, request::Command::SetFilter(messages::SetFilter { filter: Some(filter), skip_played: false }));
         let Some(response::Result::Counts(counts)) = resp.result else { panic!("{resp:?}") };
         assert_eq!(counts.total, 2);
 

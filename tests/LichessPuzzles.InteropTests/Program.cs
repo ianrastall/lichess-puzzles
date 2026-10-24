@@ -38,7 +38,7 @@ var root = Path.Combine(Path.GetTempPath(), $"lpz-interop-{Environment.ProcessId
 var sample = Path.Combine(AppContext.BaseDirectory, "sample_puzzles.csv");
 try
 {
-    using (var core = PuzzleCore.Create(root, "http://127.0.0.1:9/unused"))
+    using (var core = PuzzleCore.Create(root, "http://127.0.0.1:9/unused", "Tester"))
     {
         var status = core.GetStatus();
         Check(status.Store is null && status.StoreProblem == "No puzzles are installed.", "empty data folder reports no store");
@@ -86,6 +86,54 @@ try
         result = core.Navigate(0);
         Check(result.View.View == 0 && result.View.LastFrom == -1, "navigate to the start");
         Expect(() => core.LoadPuzzle("zzzzz"), PuzzleErrorKind.NotFound, "unknown puzzle id");
+
+        // Players, ratings and history.
+        var players = core.GetPlayers(DateTimeOffset.Now.Date);
+        Check(players.Players.Count == 1 && players.Players[0].Name == "Tester" && players.Rated, "default player");
+        var guest = core.AddPlayer("Guest");
+        Expect(() => core.AddPlayer("guest"), PuzzleErrorKind.Player, "duplicate name rejected");
+        core.SetCurrentPlayer(guest.Id);
+        result = core.LoadPuzzle("0000H");
+        Check(result.Rated && !result.RatingSettled, "a first attempt is rated");
+        core.PlayOpponent();
+        result = core.MakeMove("a7a6");
+        Check(result.Outcome == MoveOutcome.Wrong && result.RatingSettled && result.RatingAfter < result.RatingBefore, "a wrong move settles a loss");
+        result = core.MakeMove("d5g2");
+        Check(result.Outcome == MoveOutcome.Solved && result.View.Mistakes == 1, "solved after the mistake");
+        var history = core.GetHistory();
+        Check(history.Count == 1 && history[0].PuzzleId == "0000H" && history[0].Result == PuzzleResult.SolvedWithHelp && history[0].Rated, "history entry");
+        players = core.GetPlayers(DateTimeOffset.Now.Date);
+        Check(players.Current == guest.Id && players.Stats.Played == 1 && players.Stats.TodayPlayed == 1, "player totals");
+        var guestNow = players.Players.Single(p => p.Id == guest.Id);
+        Check(guestNow.Games == 1 && guestNow.Provisional && guestNow.Rating < 1500, "rating stored");
+        counts = core.SetFilter(new Filter { ThemesAny = { "mate" } }, skipPlayed: true);
+        Check(counts.Total == 1, "played puzzles skipped");
+        result = core.NextPuzzle(nearRating: true, offset: 0);
+        Check(result.View.Puzzle.Id == "00sHx", "near-rating choice from the unplayed mate");
+        core.RenamePlayer(guest.Id, "Visitor");
+        core.ClearHistory(guest.Id);
+        Check(core.GetHistory().Count == 0, "history cleared");
+        core.SetCurrentPlayer(players.Players.Single(p => p.Name == "Tester").Id);
+        core.DeletePlayer(guest.Id);
+        Expect(() => { core.DeletePlayer(core.GetPlayers(DateTimeOffset.Now.Date).Current); return (object?)null; }, PuzzleErrorKind.Player, "the last player cannot be deleted");
+
+        // Export and analysis.
+        Check(core.GetPuzzlePgn(true).Contains("[PuzzleId \"00sHx\"]"), "puzzle PGN");
+        core.SetFilter(new Filter { ThemesAny = { "mate" } });
+        var exportPath = Path.Combine(root, "mates.epd");
+        Check(core.StartExport(ExportSource.Matching, ExportFormat.Epd, false, exportPath) == 2, "export started");
+        WaitForOperation(core);
+        var exported = core.PollEvents();
+        Check(File.ReadAllLines(exportPath).Length == 2 && exported.Any(e => e.Action == EventAction.ShowFile && e.Path == exportPath), "EPD export written");
+        core.StartAnalysis("r4rk1/pp3ppp/8/2bqp2Q/3N4/P2Bn2P/1PPN1P2/R1B2RK1 b - - 0 15", TimeSpan.FromSeconds(5));
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        var analysis = core.GetAnalysis();
+        while (analysis.Running && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(20);
+            analysis = core.GetAnalysis();
+        }
+        Check(analysis.HasResult && analysis.Mate == -1 && analysis.PvSan[0] == "Qg2#", $"analysis finds the mate ({analysis.Mate}, {string.Join(" ", analysis.PvSan)})");
     }
 
     // A second core reopens the installed store.

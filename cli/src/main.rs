@@ -10,7 +10,7 @@ use lichess_puzzles_core::build::{BuildOptions, BuildProgress, build_store};
 use lichess_puzzles_core::filter::{self, Filter};
 use lichess_puzzles_core::source::{DownloadOutcome, PUZZLE_URL, Progress, Source, UpdateCheck};
 use lichess_puzzles_core::store::Store;
-use lichess_puzzles_core::{STORE_FILE, Side, chess, default_data_dir};
+use lichess_puzzles_core::{STORE_FILE, Side, chess, default_data_dir, engine};
 
 #[derive(Parser)]
 #[command(name = "lichess-puzzles", version, about = "Downloads, filters and inspects the Lichess puzzle database.")]
@@ -67,6 +67,20 @@ enum Command {
     Themes(FilterArgs),
     /// Matching puzzles per opening family.
     Openings(FilterArgs),
+    /// Run the evaluation engine on one puzzle, or on a random sample matching a filter, and
+    /// report how often its first move is the solution's.
+    Analyse {
+        id: Option<String>,
+        #[command(flatten)]
+        filter: FilterArgs,
+        #[arg(short, default_value_t = 20)]
+        n: usize,
+        /// Thinking time per puzzle.
+        #[arg(long, default_value_t = 1000)]
+        millis: u64,
+        #[arg(long)]
+        seed: Option<u64>,
+    },
 }
 
 #[derive(Args, Default)]
@@ -285,6 +299,20 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
             println!("{:>10}  matching puzzles", group(total as u64));
             Ok(())
         }
+        Command::Analyse { id, filter: args, n, millis, seed } => {
+            let store = open(&store_path)?;
+            let indices = match id {
+                Some(id) => vec![store.find(&id).ok_or_else(|| format!("no puzzle `{id}`"))?],
+                None => {
+                    let compiled = args.filter().compile(&store).map_err(|e| e.to_string())?;
+                    let seed = seed.unwrap_or_else(|| {
+                        SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_nanos() as u64)
+                    });
+                    filter::sample(&store, &compiled, n, seed)
+                }
+            };
+            analyse(&store, &indices, millis)
+        }
         Command::Openings(args) => {
             let store = open(&store_path)?;
             let compiled = args.filter().compile(&store).map_err(|e| e.to_string())?;
@@ -302,6 +330,52 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+fn analyse(store: &Store, indices: &[usize], millis: u64) -> Result<(), String> {
+    let (mut found, mut total) = (0, 0);
+    for &index in indices {
+        let p = store.puzzle(index).map_err(|e| e.to_string())?;
+        let mut board = chess::parse_fen(&p.fen).map_err(|e| e.to_string())?;
+        let uci: Vec<&str> = p.moves.iter().map(String::as_str).collect();
+        let line = chess::replay(&board, &uci).map_err(|e| e.to_string())?;
+        board.play(line[0]);
+        let stop = std::sync::atomic::AtomicBool::new(false);
+        let Some(info) = engine::analyse(&board, std::time::Duration::from_millis(millis), 64, &stop, &mut |_| {})
+        else {
+            continue;
+        };
+        let solution = chess::san_line(&p.fen, &uci[..2]).map_err(|e| e.to_string())?[1].clone();
+        // Any mating move solves a mate puzzle.
+        let hit = info.pv_uci.first().map(String::as_str) == Some(uci[1])
+            || (matches!(info.score, engine::Score::Mate(_))
+                && p.themes.iter().any(|t| t == "mate")
+                && info.pv_san[0].ends_with('#'));
+        total += 1;
+        found += usize::from(hit);
+        let score = match info.score {
+            engine::Score::Centipawns(cp) => format!("{:+.2}", f64::from(cp) / 100.0),
+            engine::Score::Mate(m) => format!("mate {m}"),
+        };
+        println!(
+            "{:<6} {:>4}  {}  depth {:>2}  {:>9}  engine {:<8} solution {:<8} {}",
+            p.id,
+            p.rating,
+            if hit { "found " } else { "missed" },
+            info.depth,
+            score,
+            info.pv_san.first().map(String::as_str).unwrap_or("-"),
+            solution,
+            info.pv_san.join(" ")
+        );
+    }
+    if total > 1 {
+        println!(
+            "Found {found} of {total} first moves ({:.0}%) at {millis} ms each.",
+            found as f64 * 100.0 / total as f64
+        );
+    }
+    Ok(())
 }
 
 fn open(path: &Path) -> Result<Store, String> {

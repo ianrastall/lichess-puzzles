@@ -1,0 +1,20 @@
+[package]
+name = "lichess_puzzles_core"
+description = "Domain core for Lichess Puzzles: download, puzzle store, filters and chess rules."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+cozy-chess.workspace = true
+csv.workspace = true
+memmap2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ureq.workspace = true
+zstd.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+zstd.workspace = true

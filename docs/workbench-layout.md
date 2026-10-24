@@ -172,7 +172,7 @@ Ctrl+C keeps its ordinary meaning in text fields and selectable text.
 
 All are `ContentDialog` unless noted. Each has one primary action named by its verb.
 
-- **Go to puzzle:** a flyout from the Puzzle menu or Ctrl+G, with a single field ("Puzzle id or lichess.org link"). It shows "No puzzle 'xxxxx' in this database" inline when the id is unknown.
+- **Go to puzzle:** a dialog from the Puzzle menu or Ctrl+G, with a single field ("Puzzle id or lichess.org link"). It shows "No puzzle 'xxxxx' in this database" inline when the id is unknown.
 - **New / Rename player:** a name field (1–40 characters, unique). Primary **Add player** / **Rename**.
 - **Delete player:** "Delete Ian, with a rating of 1,642 and 412 played puzzles? This cannot be undone." Primary **Delete player**. Not offered for the last remaining player.
 - **Clear history:** names the player and count. Primary **Clear history**. The rating is kept.
@@ -297,7 +297,9 @@ The core proof covers the download, store and filters. The shell also needs:
 7. **Store replacement** that closes and swaps safely; the update check at start.
 8. **C ABI and protobuf messages** for all of the above, following the Chess.com Crawler boundary: commands return quickly, long operations report through polled events.
 
-## Decisions to confirm
+## Decisions
+
+Ian accepted all six on 24 October 2026:
 
 1. Live filters with no Apply button.
 2. Themes hidden while solving by default.
@@ -305,3 +307,17 @@ The core proof covers the download, store and filters. The shell also needs:
 4. Update check at start on by default (one HEAD request).
 5. Flip board on F without a modifier.
 6. The default board colours, and the piece set given the Merida licence question in the brief.
+
+## Implementation status (stage 4, 24 October 2026)
+
+Built as specified, except for the parts that wait for stage 5:
+
+- The History view and the puzzle pane's view selector.
+- The Players menu and player strip.
+- Rated play and the near-my-rating option.
+- Skip played puzzles.
+- Filter presets.
+- The export commands and Save puzzle as PGN.
+- The Evaluation section and settings.
+
+These are left out of the menus rather than shown disabled. The data folder is shown with **Show folder**, but it cannot yet be moved.

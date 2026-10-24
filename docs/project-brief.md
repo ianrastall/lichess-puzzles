@@ -107,13 +107,34 @@ Store format, filter fields and CLI commands are described in the [readme](../re
 ## Open questions
 
 - Whether a GitHub repository and public releases are wanted now.
-- Whether to keep the downloaded `.zst` after a successful build (needed only to rebuild without downloading again).
+- Whether to keep the downloaded `.zst` after a successful build (needed only to rebuild without downloading again). The app keeps it by default; **Settings > Storage** turns that off.
 - Piece set licensing (above).
 
 ## Staged progression
 
 1. Confirm this brief and the open questions.
-2. Workbench layout: regions, menus, empty/downloading/building/ready/error states, keyboard behaviour. **Drafted 24 October 2026:** [workbench layout](workbench-layout.md), with its decisions to confirm.
+2. Workbench layout: regions, menus, empty/downloading/building/ready/error states, keyboard behaviour. **Done 24 October 2026:** [workbench layout](workbench-layout.md); Ian accepted its six decisions.
 3. Technical proof: Rust workspace and CLI that download, build the store and answer a filtered count against the real database, with measured build time, store size and query time. **Done 24 October 2026.**
-4. ABI and WinUI shell over that core: open the store, filter, play a puzzle to completion.
-5. Ratings, history, export, installer.
+4. ABI and WinUI shell over that core: open the store, filter, play a puzzle to completion. **Done 24 October 2026;** see [Desktop shell](#desktop-shell-stage-4).
+5. Players and Glicko-2 ratings, history, skip played puzzles, near-my-rating selection, filter presets, export, evaluation engine, installer.
+
+## Desktop shell (stage 4)
+
+Built 24 October 2026:
+
+- **Core:** puzzle session state machine (`session.rs`: opponent's move, solving, correct, wrong, hint, solution, retry, navigation, any mate accepted), theme catalogue with groups, names and descriptions written for this app (`catalogue.rs`), and a service that owns the open store, filter and session and runs downloads, builds and update checks on a thread (`service.rs`). New stores are built beside the open one and swapped after closing it.
+- **ABI version 1** (`core/ffi`, `proto/puzzles.proto`): the Chess.com Crawler pattern, with seven `lpz_` exports, protobuf requests and responses, polled events and transport-only status codes. The C# interop console (`tests/LichessPuzzles.InteropTests`) checks 19 cases across the real DLL boundary.
+- **WinUI 3 shell** (`src/LichessPuzzles.App`):
+  - Menu bar, filter pane, board area, puzzle pane and status bar, as in the [workbench layout](workbench-layout.md).
+  - A chessboard control drawn with XAML shapes and the piece SVGs. It supports click, drag and keyboard moves, a promotion picker, markers for hints and right or wrong moves, animation, and screen-reader announcements.
+  - First-run download and build with pause and cancel; import of a `.csv` or `.csv.zst`; update check and switching to the new puzzles.
+  - Live filters with counts for each theme and opening.
+  - Settings window, including the shared accent control.
+  - The puzzle in progress is restored at the next launch.
+- **Build:** `pwsh build/build.ps1` formats, lints and tests the Rust workspace, runs the interop checks and publishes a self-contained portable folder and zip with the CLI.
+- **Checked on this machine:**
+  - The app opened the 6,157,341-puzzle store and checked for an update at start.
+  - Ian played puzzles through it: a clean solve, a wrong move, then the next puzzle.
+  - State was saved and restored across launches.
+  - The first-run screen showed correctly with an empty data folder.
+  - Not exercised in the GUI: a full download from the app, import, the Settings window, the narrow-window filter overlay, and keyboard moves on the board. The core and interop tests cover the operations behind them.

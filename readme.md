@@ -2,13 +2,19 @@
 
 A Windows desktop app for downloading, filtering and playing the [Lichess puzzle database](https://database.lichess.org/#puzzles) offline. Part of the Jupiter family.
 
-Status: the Rust domain core and command-line shell are built (stage 3 of the [project brief](docs/project-brief.md)). The WinUI 3 shell, ratings, history and export follow.
+Status: the desktop app plays, filters, downloads and updates the puzzles (stage 4 of the [project brief](docs/project-brief.md)). Players with ratings, history, export, the evaluation engine and an installer follow in stage 5.
 
 - [Project brief](docs/project-brief.md): decisions, source data, workflows, measurements and open questions
 - [Workbench layout](docs/workbench-layout.md): regions, menus, states and keyboard behaviour for the desktop shell
 - [Source map](docs/source-map.json): related folders and their dispositions
 
 This is a fresh repository. The previous [Lichess Puzzle Desktop](<D:/dev/proj/lichess-puzzle-desktop>) remains in place as a reference.
+
+## Desktop app
+
+Run `LichessPuzzles.exe` from the published folder `dist/LichessPuzzles` (or the zip beside it). Windows 11 24H2 or newer, x64; no separate runtime installation is needed.
+
+On first run the app offers to download the Lichess puzzle database (about 300 MB) and build the store (about 500 MB, half a minute), or to import a `.csv` or `.csv.zst` you already have. Filters apply as they change; **Next puzzle** (Ctrl+N) draws a random matching puzzle. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
 
 ## Command line
 
@@ -33,7 +39,11 @@ source\lichess_db_puzzle.csv.zst        the download
 source\download.json                    ETag, Last-Modified and length of the completed download
 source\lichess_db_puzzle.csv.zst.part   an interrupted download, with its own .part.json record
 puzzles.store                           the puzzle store
+puzzles-next.store                      an update built beside the open store, until it replaces it
+settings.json, ui.json                  the desktop app's settings, filters, layout and puzzle in progress
 ```
+
+`LICHESS_PUZZLES_DATA_DIR` points the desktop app at another folder.
 
 ## Puzzle store
 
@@ -48,11 +58,22 @@ Every puzzle is checked during the build: the FEN must parse and every move must
 
 ## Build
 
-Requirements: Rust 1.99.1 (pinned in `rust-toolchain.toml`) with the MSVC toolchain, Windows 11 x64.
+Requirements: Rust 1.99.1 (pinned in `rust-toolchain.toml`), .NET SDK 10.0.1xx (`global.json`), Visual Studio Build Tools with MSVC (including its x64 redistributable files) and the Windows 11 SDK, Windows 11 x64.
 
 ```powershell
-cargo test --workspace
-cargo build --release
+pwsh build/build.ps1
+```
+
+This formats, lints and tests the Rust workspace, runs the C# interop checks and publishes `dist/LichessPuzzles` and `dist/LichessPuzzles-<version>-win-x64.zip`, including the CLI. `-SkipChecks` publishes only.
+
+```text
+core/domain                    Rust domain core: download, store, filters, session, service
+core/ffi                       C ABI (lpz_*) over the service, protobuf messages from proto/puzzles.proto
+cli                            lichess-puzzles command line
+src/LichessPuzzles.Interop     C# wrapper over the ABI
+src/LichessPuzzles.App         WinUI 3 shell
+tests/LichessPuzzles.InteropTests   checks across the real DLL boundary
+build                          build script, native build targets, icon script
 ```
 
 ## Credits and licences
@@ -60,3 +81,5 @@ cargo build --release
 - Code: MIT, see `LICENSE`.
 - Puzzles: the Lichess puzzle database, released under [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
 - Chess rules: [cozy-chess](https://github.com/analog-hors/cozy-chess), MIT.
+- Pieces: Merida by Armando Hernandez Marroquin, from [lichess-org/lila](https://github.com/lichess-org/lila/tree/master/public/piece/merida), GPL version 2 or later. Distributing the app with these files means complying with that licence; see the brief's open questions.
+- Theme descriptions are written for this app.

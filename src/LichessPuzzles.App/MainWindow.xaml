@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Jupiter.LichessPuzzles.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:board="using:Jupiter.LichessPuzzles.App.Controls"
+    Title="Lichess Puzzles">
+
+    <Grid x:Name="Root" Background="{ThemeResource JupiterWindowBrush}" RequestedTheme="Dark" KeyDown="OnRootKeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <MenuBar x:Name="Menu">
+            <MenuBarItem Title="File">
+                <MenuFlyoutItem x:Name="DownloadItem" Text="Download puzzles…" Click="OnDownload" />
+                <MenuFlyoutItem x:Name="CheckUpdateItem" Text="Check for update" Click="OnCheckUpdate" />
+                <MenuFlyoutItem x:Name="ImportItem" Text="Import puzzle file…" Click="OnImport" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Database details…" Click="OnDatabaseDetails" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem x:Name="SettingsItem" Text="Settings" Click="OnSettings" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Exit" Click="OnExit" KeyboardAcceleratorTextOverride="Alt+F4" />
+            </MenuBarItem>
+            <MenuBarItem Title="Edit">
+                <MenuFlyoutItem x:Name="CopyFenItem" Text="Copy FEN" Click="OnCopyFen">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control,Shift" Key="C" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="CopyLinkItem" Text="Copy puzzle link" Click="OnCopyLink" />
+            </MenuBarItem>
+            <MenuBarItem Title="View">
+                <ToggleMenuFlyoutItem x:Name="FiltersItem" Text="Filters" Click="OnToggleFilters">
+                    <ToggleMenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control,Shift" Key="F" />
+                    </ToggleMenuFlyoutItem.KeyboardAccelerators>
+                </ToggleMenuFlyoutItem>
+                <MenuFlyoutItem Text="Flip board" Click="OnFlip" KeyboardAcceleratorTextOverride="F" />
+                <ToggleMenuFlyoutItem x:Name="CoordinatesItem" Text="Coordinates" Click="OnToggleCoordinates" />
+            </MenuBarItem>
+            <MenuBarItem Title="Puzzle">
+                <MenuFlyoutItem x:Name="NextItem" Text="Next puzzle" Click="OnNext">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="N" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="HintItem" Text="Hint" Click="OnHint">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="H" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="SolutionItem" Text="Show solution" Click="OnShowSolution">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control,Shift" Key="H" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="RetryItem" Text="Retry" Click="OnRetry">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="R" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="GoToItem" Text="Go to puzzle…" Click="OnGoTo">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="G" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem x:Name="FirstItem" Text="First position" Click="OnFirst" KeyboardAcceleratorTextOverride="Home" />
+                <MenuFlyoutItem x:Name="BackItem" Text="Back" Click="OnBack" KeyboardAcceleratorTextOverride="Left" />
+                <MenuFlyoutItem x:Name="ForwardItem" Text="Forward" Click="OnForward" KeyboardAcceleratorTextOverride="Right" />
+                <MenuFlyoutItem x:Name="LatestItem" Text="Latest position" Click="OnLatest" KeyboardAcceleratorTextOverride="End" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem x:Name="OpenLichessItem" Text="Open on lichess.org" Click="OnOpenLichess" />
+                <MenuFlyoutItem x:Name="OpenGameItem" Text="Open source game" Click="OnOpenGame" />
+            </MenuBarItem>
+            <MenuBarItem Title="Help">
+                <MenuFlyoutItem Text="Keyboard shortcuts" Click="OnShortcuts">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F1" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="About Lichess Puzzles" Click="OnAbout" />
+            </MenuBarItem>
+        </MenuBar>
+
+        <Grid x:Name="Workspace" Grid.Row="1" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="FilterColumn" Width="300" MinWidth="0" />
+                <ColumnDefinition x:Name="FilterSplitterColumn" Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="320" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="PuzzleColumn" Width="340" MinWidth="300" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="FilterHost" />
+            <controls:GridSplitter x:Name="FilterSplitter" Grid.Column="1" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
+                                   Background="{ThemeResource JupiterWindowBrush}" AutomationProperties.Name="Resize filters" />
+
+            <!-- Board area -->
+            <Grid x:Name="BoardArea" Grid.Column="2" Padding="16" RowSpacing="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <board:ChessBoard x:Name="Board" />
+                <StackPanel x:Name="Navigation" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                    <Button Command="{x:Bind Puzzle.FirstCommand}" IsEnabled="{x:Bind Puzzle.CanGoBack, Mode=OneWay}"
+                            AutomationProperties.Name="First position" ToolTipService.ToolTip="First position (Home)">
+                        <FontIcon Glyph="&#xE892;" FontSize="16" />
+                    </Button>
+                    <Button Command="{x:Bind Puzzle.BackCommand}" IsEnabled="{x:Bind Puzzle.CanGoBack, Mode=OneWay}"
+                            AutomationProperties.Name="Back" ToolTipService.ToolTip="Back (Left)">
+                        <FontIcon Glyph="&#xE76B;" FontSize="16" />
+                    </Button>
+                    <Button Command="{x:Bind Puzzle.ForwardCommand}" IsEnabled="{x:Bind Puzzle.CanGoForward, Mode=OneWay}"
+                            AutomationProperties.Name="Forward" ToolTipService.ToolTip="Forward (Right)">
+                        <FontIcon Glyph="&#xE76C;" FontSize="16" />
+                    </Button>
+                    <Button Command="{x:Bind Puzzle.LatestCommand}" IsEnabled="{x:Bind Puzzle.CanGoForward, Mode=OneWay}"
+                            AutomationProperties.Name="Latest position" ToolTipService.ToolTip="Latest position (End)">
+                        <FontIcon Glyph="&#xE893;" FontSize="16" />
+                    </Button>
+                    <Button Click="OnFlip" Margin="16,0,0,0" IsEnabled="{x:Bind Puzzle.HasPuzzle, Mode=OneWay}"
+                            AutomationProperties.Name="Flip board" ToolTipService.ToolTip="Flip board (F)">
+                        <FontIcon Glyph="&#xE8AB;" FontSize="16" />
+                    </Button>
+                </StackPanel>
+
+                <!-- Empty state: no puzzles installed, downloading, building or unreadable -->
+                <Border Grid.RowSpan="2" Background="{ThemeResource JupiterWindowBrush}"
+                        Visibility="{x:Bind ShowIf(Status.ShowEmptyState), Mode=OneWay}">
+                    <StackPanel MaxWidth="440" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+                        <TextBlock Text="{x:Bind Status.EmptyTitle, Mode=OneWay}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind Status.EmptyMessage, Mode=OneWay}" Style="{StaticResource CaptionStyle}" FontSize="14" />
+                        <StackPanel Spacing="8" Visibility="{x:Bind ShowIf(Status.IsRunning), Mode=OneWay}">
+                            <ProgressBar Value="{x:Bind Status.OperationPercent, Mode=OneWay}" IsIndeterminate="{x:Bind Status.IsIndeterminate, Mode=OneWay}"
+                                         AutomationProperties.Name="Progress" />
+                            <TextBlock Text="{x:Bind Status.OperationText, Mode=OneWay}" Style="{StaticResource CaptionStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Pause" Click="OnPause" Visibility="{x:Bind ShowIf(Status.CanPause), Mode=OneWay}"
+                                        ToolTipService.ToolTip="Stop the download; it resumes from here later" />
+                                <Button Content="Cancel" Click="OnCancelOperation" IsEnabled="{x:Bind Status.CanCancel, Mode=OneWay}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ShowIf(Status.ShowEmptyActions), Mode=OneWay}">
+                            <Button x:Name="EmptyPrimary" Content="{x:Bind Status.EmptyPrimaryText, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}"
+                                    Click="OnEmptyPrimary" />
+                            <Button Content="Import puzzle file…" Click="OnImport" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <controls:GridSplitter Grid.Column="3" Width="8" ResizeBehavior="BasedOnAlignment" ResizeDirection="Columns"
+                                   Background="{ThemeResource JupiterWindowBrush}" AutomationProperties.Name="Resize puzzle pane" />
+            <Border x:Name="PuzzleHost" Grid.Column="4" />
+
+            <!-- The filter pane as an overlay in narrow windows -->
+            <Border x:Name="FilterOverlay" Grid.ColumnSpan="3" HorizontalAlignment="Left" Width="300" Visibility="Collapsed"
+                    BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,0,1,0" />
+        </Grid>
+
+        <!-- Status bar -->
+        <Grid x:Name="StatusBar" Grid.Row="2" MinHeight="32" Padding="12,0" ColumnSpacing="16" Background="{ThemeResource JupiterWindowBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <HyperlinkButton x:Name="DatabaseButton" Content="{x:Bind Status.DatabaseText, Mode=OneWay}" Click="OnDatabaseDetails" Padding="4,2"
+                             FontSize="12" Foreground="{ThemeResource JupiterSecondaryTextBrush}" ToolTipService.ToolTip="Database details" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                        Visibility="{x:Bind ShowIf(Status.HasNotice), Mode=OneWay}">
+                <FontIcon Glyph="{x:Bind SeverityGlyph(Status.NoticeSeverity), Mode=OneWay}" FontSize="14"
+                          Foreground="{x:Bind SeverityBrush(Status.NoticeSeverity), Mode=OneWay}" VerticalAlignment="Center" />
+                <TextBlock Text="{x:Bind Status.NoticeText, Mode=OneWay}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           AutomationProperties.LiveSetting="Polite" />
+                <HyperlinkButton Content="{x:Bind Status.NoticeActionText, Mode=OneWay}" Click="OnNoticeAction" Padding="4,2" FontSize="12"
+                                 Visibility="{x:Bind ShowIf(Status.HasNoticeAction), Mode=OneWay}" />
+                <Button Click="OnDismissNotice" Padding="6,4" Background="Transparent" BorderThickness="0"
+                        AutomationProperties.Name="Dismiss" ToolTipService.ToolTip="Dismiss">
+                    <FontIcon Glyph="&#xE711;" FontSize="10" />
+                </Button>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ShowIf(Status.IsRunning), Mode=OneWay}">
+                <TextBlock Text="{x:Bind Status.OperationText, Mode=OneWay}" FontSize="12" VerticalAlignment="Center" />
+                <ProgressBar Width="140" VerticalAlignment="Center" Value="{x:Bind Status.OperationPercent, Mode=OneWay}"
+                             IsIndeterminate="{x:Bind Status.IsIndeterminate, Mode=OneWay}" AutomationProperties.Name="Operation progress" />
+                <HyperlinkButton Content="Pause" Click="OnPause" Padding="4,2" FontSize="12" Visibility="{x:Bind ShowIf(Status.CanPause), Mode=OneWay}" />
+                <HyperlinkButton Content="Cancel" Click="OnCancelOperation" Padding="4,2" FontSize="12" IsEnabled="{x:Bind Status.CanCancel, Mode=OneWay}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

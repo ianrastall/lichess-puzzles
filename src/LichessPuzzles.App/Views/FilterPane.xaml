@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Jupiter.LichessPuzzles.App.Views.FilterPane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:Jupiter.LichessPuzzles.App.ViewModels"
+    xmlns:views="using:Jupiter.LichessPuzzles.App.Views">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="GroupTemplate" x:DataType="vm:ThemeGroupRow">
+            <StackPanel Orientation="Horizontal" Spacing="8" Padding="0,6,0,2">
+                <FontIcon Glyph="{x:Bind Chevron, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource JupiterSecondaryTextBrush}" />
+                <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource JupiterSecondaryTextBrush}" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="ThemeTemplate" x:DataType="vm:ThemeRow">
+            <Grid ColumnSpacing="8" ToolTipService.ToolTip="{x:Bind Description}" AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Text="{x:Bind StateLabel, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{x:Bind CountText, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
+                           Foreground="{ThemeResource JupiterQuietTextBrush}" />
+            </Grid>
+        </DataTemplate>
+        <views:ThemeRowTemplateSelector x:Key="ThemeRowSelector" Group="{StaticResource GroupTemplate}" Theme="{StaticResource ThemeTemplate}" />
+    </UserControl.Resources>
+
+    <Grid Background="{ThemeResource JupiterSurfaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: match count and reset -->
+        <Grid Padding="16,12,8,8" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="MatchCount" Text="{x:Bind ViewModel.MatchText, Mode=OneWay}" Style="{StaticResource PaneHeadingStyle}"
+                       TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+            <HyperlinkButton Grid.Column="1" Content="Reset filters" Command="{x:Bind ViewModel.ResetCommand}"
+                             IsEnabled="{x:Bind ViewModel.IsAvailable, Mode=OneWay}" Padding="4" />
+            <Button x:Name="CloseOverlayButton" Grid.Column="2" Visibility="Collapsed" Click="OnCloseOverlay"
+                    AutomationProperties.Name="Close filters" ToolTipService.ToolTip="Close filters (Ctrl+Shift+F)" Padding="6">
+                <FontIcon Glyph="&#xE711;" FontSize="12" />
+            </Button>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" IsEnabled="{x:Bind ViewModel.IsAvailable, Mode=OneWay}">
+            <StackPanel Padding="16,0,16,24" Spacing="16">
+                <TextBlock Text="Filters are available once puzzles are installed." Style="{StaticResource ExplanationStyle}"
+                           Visibility="{x:Bind NotAvailable(ViewModel.IsAvailable), Mode=OneWay}" />
+
+                <!-- Rating -->
+                <StackPanel Spacing="4">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <NumberBox x:Name="RatingFrom" Header="Rating from" Value="{x:Bind ViewModel.RatingMin, Mode=TwoWay}"
+                                   PlaceholderText="Any"
+                                   Minimum="0" Maximum="4000" SmallChange="50" LargeChange="200" SpinButtonPlacementMode="Compact"
+                                   ValidationMode="InvalidInputOverwritten" />
+                        <NumberBox Grid.Column="1" Header="to" Value="{x:Bind ViewModel.RatingMax, Mode=TwoWay}"
+                                   PlaceholderText="Any"
+                                   Minimum="0" Maximum="4000" SmallChange="50" LargeChange="200" SpinButtonPlacementMode="Compact"
+                                   ValidationMode="InvalidInputOverwritten" AutomationProperties.Name="Rating to" />
+                    </Grid>
+                    <TextBlock Text="{x:Bind ViewModel.RatingRange, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}" />
+                    <TextBlock Text="{x:Bind ViewModel.RatingNote, Mode=OneWay}" Style="{StaticResource ExplanationStyle}"
+                               Foreground="{ThemeResource JupiterWarningBrush}" Visibility="{x:Bind HasText(ViewModel.RatingNote), Mode=OneWay}" />
+                </StackPanel>
+
+                <!-- Themes -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Themes" Style="{StaticResource PaneHeadingStyle}" />
+                    <TextBox PlaceholderText="Find theme" Text="{x:Bind ViewModel.ThemeSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="Find theme" />
+                    <RadioButtons Header="Included themes must" SelectedIndex="{x:Bind ViewModel.MatchModeIndex, Mode=TwoWay}" MaxColumns="2">
+                        <x:String>Any</x:String>
+                        <x:String>All</x:String>
+                    </RadioButtons>
+                    <ListView x:Name="ThemeList" ItemsSource="{x:Bind ViewModel.ThemeRows}" ItemTemplateSelector="{StaticResource ThemeRowSelector}"
+                              SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnThemeClick" Margin="-12,0,-12,0"
+                              AutomationProperties.Name="Themes: select to cycle include, exclude, not used"
+                              ScrollViewer.VerticalScrollMode="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                                <Setter Property="MinHeight" Value="30" />
+                                <Setter Property="Padding" Value="12,0,12,0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                    <TextBlock Text="Select a theme to include it; select again to exclude it." Style="{StaticResource QuietCaptionStyle}" />
+                </StackPanel>
+
+                <!-- Opening -->
+                <StackPanel Spacing="8">
+                    <AutoSuggestBox x:Name="OpeningBox" Header="Opening" PlaceholderText="Search families and variations"
+                                    TextChanged="OnOpeningTextChanged" SuggestionChosen="OnOpeningChosen" QuerySubmitted="OnOpeningSubmitted"
+                                    UpdateTextOnSelect="False">
+                        <AutoSuggestBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OpeningSuggestion">
+                                <StackPanel Padding="0,4">
+                                    <TextBlock Text="{x:Bind Name}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{x:Bind Detail}" FontSize="12" Foreground="{ThemeResource JupiterQuietTextBrush}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </AutoSuggestBox.ItemTemplate>
+                    </AutoSuggestBox>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Openings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OpeningToken">
+                                <Grid ColumnSpacing="4" Margin="0,2" Padding="8,2,2,2" CornerRadius="4" Background="{ThemeResource JupiterRaisedBrush}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Padding="6" Background="Transparent" BorderThickness="0"
+                                            Click="OnRemoveOpening" Tag="{x:Bind}"
+                                            AutomationProperties.Name="{x:Bind RemoveName}" ToolTipService.ToolTip="{x:Bind RemoveName}">
+                                        <FontIcon Glyph="&#xE711;" FontSize="10" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Puzzles without an opening tag are excluded while an opening is chosen." Style="{StaticResource QuietCaptionStyle}" />
+                </StackPanel>
+
+                <!-- Side and length -->
+                <ComboBox Header="Side to solve" SelectedIndex="{x:Bind ViewModel.SideIndex, Mode=TwoWay}" HorizontalAlignment="Stretch">
+                    <x:String>Either</x:String>
+                    <x:String>White</x:String>
+                    <x:String>Black</x:String>
+                </ComboBox>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Solution length, in the solver's moves" Style="{StaticResource PaneHeadingStyle}" FontWeight="Normal" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <NumberBox Header="From" Value="{x:Bind ViewModel.LengthMin, Mode=TwoWay}" PlaceholderText="1"
+                                   Minimum="1" Maximum="17" SmallChange="1" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten"
+                                   AutomationProperties.Name="Solution length from" />
+                        <NumberBox Grid.Column="1" Header="To" Value="{x:Bind ViewModel.LengthMax, Mode=TwoWay}" PlaceholderText="17"
+                                   Minimum="1" Maximum="17" SmallChange="1" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten"
+                                   AutomationProperties.Name="Solution length to" />
+                    </Grid>
+                </StackPanel>
+
+                <!-- Quality -->
+                <Expander Header="Quality" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          IsExpanded="{x:Bind ViewModel.QualityExpanded, Mode=TwoWay}">
+                    <StackPanel Spacing="12">
+                        <NumberBox Header="Maximum rating deviation" Value="{x:Bind ViewModel.MaxDeviation, Mode=TwoWay}" PlaceholderText="Any"
+                                   Minimum="0" Maximum="500" SmallChange="10" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten" />
+                        <NumberBox Header="Minimum popularity (−100 to 100)" Value="{x:Bind ViewModel.MinPopularity, Mode=TwoWay}" PlaceholderText="Any"
+                                   Minimum="-100" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten" />
+                        <NumberBox Header="Minimum plays" Value="{x:Bind ViewModel.MinPlays, Mode=TwoWay}" PlaceholderText="Any"
+                                   Minimum="0" Maximum="10000000" SmallChange="100" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

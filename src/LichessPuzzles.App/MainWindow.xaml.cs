@@ -230,8 +230,7 @@ public sealed partial class MainWindow : Window, IBoardView
 
     // Keyboard ------------------------------------------------------------------------------------
 
-    private static bool IsTextInput(object? element) => element is TextBox or AutoSuggestBox or NumberBox or PasswordBox or RichEditBox
-        || (element is FrameworkElement fe && FindParent<NumberBox>(fe) is not null)
+    private static bool IsTextInput(object? element) => element is TextBox or AutoSuggestBox or PasswordBox or RichEditBox
         || (element is FrameworkElement f2 && FindParent<AutoSuggestBox>(f2) is not null);
 
     private static T? FindParent<T>(DependencyObject child) where T : DependencyObject

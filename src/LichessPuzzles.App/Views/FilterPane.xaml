@@ -62,28 +62,15 @@
                 <TextBlock Text="Filters are available once puzzles are installed." Style="{StaticResource ExplanationStyle}"
                            Visibility="{x:Bind NotAvailable(ViewModel.IsAvailable), Mode=OneWay}" />
 
-                <!-- Preset -->
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <ComboBox Header="Preset" ItemsSource="{x:Bind ViewModel.PresetNames}" SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
-                              PlaceholderText="{x:Bind ViewModel.PresetPlaceholder, Mode=OneWay}" IsEnabled="{x:Bind ViewModel.HasPresets, Mode=OneWay}"
-                              HorizontalAlignment="Stretch" AutomationProperties.Name="Preset" />
-                    <Button Grid.Column="1" VerticalAlignment="Bottom" Padding="8,7" AutomationProperties.Name="Preset options" ToolTipService.ToolTip="Save, rename or delete presets">
-                        <FontIcon Glyph="&#xE712;" FontSize="14" />
-                        <Button.Flyout>
-                            <MenuFlyout Opening="OnPresetMenuOpening">
-                                <MenuFlyoutItem Text="Save as preset…" Click="OnSavePreset" />
-                                <MenuFlyoutItem x:Name="RenamePresetItem" Text="Rename preset…" Click="OnRenamePreset" />
-                                <MenuFlyoutItem x:Name="DeletePresetItem" Text="Delete preset" Click="OnDeletePreset" />
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                </Grid>
-                <TextBlock Text="Save the current filters as a preset with the button beside the box." Style="{StaticResource QuietCaptionStyle}"
-                           Margin="0,-8,0,0" Visibility="{x:Bind Shown(ViewModel.HasNoPresets), Mode=OneWay}" />
+                <!-- Presets -->
+                <DropDownButton x:Name="PresetButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                AutomationProperties.Name="{x:Bind ViewModel.PresetButtonText, Mode=OneWay}"
+                                ToolTipService.ToolTip="Apply, save, rename or delete filter presets">
+                    <TextBlock Text="{x:Bind ViewModel.PresetButtonText, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                    <DropDownButton.Flyout>
+                        <MenuFlyout x:Name="PresetMenu" Opening="OnPresetMenuOpening" Placement="BottomEdgeAlignedLeft" />
+                    </DropDownButton.Flyout>
+                </DropDownButton>
 
                 <!-- Rating -->
                 <StackPanel Spacing="4">
@@ -92,14 +79,12 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <controls:StepNumberBox StartValue="1200" x:Name="RatingFrom" Header="Rating from" Value="{x:Bind ViewModel.RatingMin, Mode=TwoWay}"
+                        <controls:NumericTextBox x:Name="RatingFrom" Header="Rating from" Value="{x:Bind ViewModel.RatingMin, Mode=TwoWay}"
                                    PlaceholderText="Any"
-                                   Minimum="0" Maximum="4000" SmallChange="50" LargeChange="200" SpinButtonPlacementMode="Compact"
-                                   ValidationMode="InvalidInputOverwritten" />
-                        <controls:StepNumberBox StartValue="1800" Grid.Column="1" Header="to" Value="{x:Bind ViewModel.RatingMax, Mode=TwoWay}"
+                                   Minimum="0" Maximum="4000" />
+                        <controls:NumericTextBox Grid.Column="1" Header="to" Value="{x:Bind ViewModel.RatingMax, Mode=TwoWay}"
                                    PlaceholderText="Any"
-                                   Minimum="0" Maximum="4000" SmallChange="50" LargeChange="200" SpinButtonPlacementMode="Compact"
-                                   ValidationMode="InvalidInputOverwritten" AutomationProperties.Name="Rating to" />
+                                   Minimum="0" Maximum="4000" AutomationProperties.Name="Rating to" />
                     </Grid>
                     <TextBlock Text="{x:Bind ViewModel.RatingRange, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}" />
                     <TextBlock Text="{x:Bind ViewModel.RatingNote, Mode=OneWay}" Style="{StaticResource ExplanationStyle}"
@@ -113,9 +98,8 @@
                         <x:String>Near my rating</x:String>
                     </RadioButtons>
                     <StackPanel Spacing="4" Visibility="{x:Bind Shown(ViewModel.IsNearRating), Mode=OneWay}">
-                        <controls:StepNumberBox StartValue="0" Header="Difficulty offset" Value="{x:Bind ViewModel.DifficultyOffset, Mode=TwoWay}"
-                                   Minimum="-600" Maximum="600" SmallChange="50" LargeChange="200" SpinButtonPlacementMode="Compact"
-                                   ValidationMode="InvalidInputOverwritten" />
+                        <controls:NumericTextBox Header="Difficulty offset, −600 to 600" Value="{x:Bind ViewModel.DifficultyOffset, Mode=TwoWay}"
+                                   Minimum="-600" Maximum="600" />
                         <TextBlock Text="{x:Bind ViewModel.TargetText, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}" />
                     </StackPanel>
                     <CheckBox Content="Skip puzzles this player has played" IsChecked="{x:Bind ViewModel.SkipPlayed, Mode=TwoWay}" />
@@ -193,11 +177,11 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <controls:StepNumberBox StartValue="1" Header="From" Value="{x:Bind ViewModel.LengthMin, Mode=TwoWay}" PlaceholderText="1"
-                                   Minimum="1" Maximum="17" SmallChange="1" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten"
+                        <controls:NumericTextBox Header="From" Value="{x:Bind ViewModel.LengthMin, Mode=TwoWay}" PlaceholderText="1"
+                                   Minimum="1" Maximum="17"
                                    AutomationProperties.Name="Solution length from" />
-                        <controls:StepNumberBox StartValue="3" Grid.Column="1" Header="To" Value="{x:Bind ViewModel.LengthMax, Mode=TwoWay}" PlaceholderText="17"
-                                   Minimum="1" Maximum="17" SmallChange="1" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten"
+                        <controls:NumericTextBox Grid.Column="1" Header="To" Value="{x:Bind ViewModel.LengthMax, Mode=TwoWay}" PlaceholderText="17"
+                                   Minimum="1" Maximum="17"
                                    AutomationProperties.Name="Solution length to" />
                     </Grid>
                 </StackPanel>
@@ -206,12 +190,12 @@
                 <Expander Header="Quality" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                           IsExpanded="{x:Bind ViewModel.QualityExpanded, Mode=TwoWay}">
                     <StackPanel Spacing="12">
-                        <controls:StepNumberBox StartValue="100" Header="Maximum rating deviation" Value="{x:Bind ViewModel.MaxDeviation, Mode=TwoWay}" PlaceholderText="Any"
-                                   Minimum="0" Maximum="500" SmallChange="10" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten" />
-                        <controls:StepNumberBox StartValue="80" Header="Minimum popularity (−100 to 100)" Value="{x:Bind ViewModel.MinPopularity, Mode=TwoWay}" PlaceholderText="Any"
-                                   Minimum="-100" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten" />
-                        <controls:StepNumberBox StartValue="1000" Header="Minimum plays" Value="{x:Bind ViewModel.MinPlays, Mode=TwoWay}" PlaceholderText="Any"
-                                   Minimum="0" Maximum="10000000" SmallChange="100" SpinButtonPlacementMode="Compact" ValidationMode="InvalidInputOverwritten" />
+                        <controls:NumericTextBox Header="Maximum rating deviation, 0 to 500" Value="{x:Bind ViewModel.MaxDeviation, Mode=TwoWay}" PlaceholderText="Any"
+                                   Minimum="0" Maximum="500" />
+                        <controls:NumericTextBox Header="Minimum popularity, −100 to 100" Value="{x:Bind ViewModel.MinPopularity, Mode=TwoWay}" PlaceholderText="Any"
+                                   Minimum="-100" Maximum="100" />
+                        <controls:NumericTextBox Header="Minimum plays" Value="{x:Bind ViewModel.MinPlays, Mode=TwoWay}" PlaceholderText="Any"
+                                   Minimum="0" Maximum="10000000" />
                     </StackPanel>
                 </Expander>
             </StackPanel>

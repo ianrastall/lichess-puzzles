@@ -193,33 +193,30 @@ public sealed partial class FilterViewModel : ObservableObject
     /// <summary>Preset names, with an empty first entry for "no preset".</summary>
     public ObservableCollection<string> PresetNames { get; } = [];
 
+    /// <summary>The preset the current filters came from; cleared when they are edited.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PresetButtonText))]
     public partial string? SelectedPreset { get; set; }
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNoPresets), nameof(PresetPlaceholder))]
-    public partial bool HasPresets { get; set; }
+    public string PresetButtonText => SelectedPreset is { } name ? $"Preset: {name}" : "Presets";
 
-    public bool HasNoPresets => !HasPresets;
-
-    public string PresetPlaceholder => HasPresets ? "Current filters" : "No saved presets";
+    /// <summary>Applies a saved preset, also when it is already the selected one.</summary>
+    public void ApplyPreset(string name)
+    {
+        var preset = _settings.Value.Presets.FirstOrDefault(p => p.Name == name);
+        if (preset is null)
+        {
+            return;
+        }
+        _loading = true;
+        SelectedPreset = name;
+        _loading = false;
+        ApplyState(preset.Filter.Copy());
+    }
 
     partial void OnChooseIndexChanged(int value) => Changed();
     partial void OnDifficultyOffsetChanged(double value) => Changed();
     partial void OnSkipPlayedChanged(bool value) => Changed();
-
-    partial void OnSelectedPresetChanged(string? value)
-    {
-        if (_loading || string.IsNullOrEmpty(value))
-        {
-            return;
-        }
-        var preset = _settings.Value.Presets.FirstOrDefault(p => p.Name == value);
-        if (preset is not null)
-        {
-            ApplyState(preset.Filter.Copy());
-        }
-    }
 
     private void RefreshPresetNames(string? select)
     {
@@ -230,7 +227,6 @@ public sealed partial class FilterViewModel : ObservableObject
             PresetNames.Add(name);
         }
         SelectedPreset = select is not null && PresetNames.Contains(select) ? select : null;
-        HasPresets = PresetNames.Count > 0;
         _loading = false;
     }
 

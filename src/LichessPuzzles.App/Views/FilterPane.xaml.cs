@@ -34,9 +34,28 @@ public sealed partial class FilterPane : UserControl
 
     private void OnPresetMenuOpening(object sender, object e)
     {
+        PresetMenu.Items.Clear();
+        if (ViewModel.PresetNames.Count == 0)
+        {
+            PresetMenu.Items.Add(new MenuFlyoutItem { Text = "No saved presets", IsEnabled = false });
+        }
+        foreach (var name in ViewModel.PresetNames)
+        {
+            var item = new RadioMenuFlyoutItem { Text = name, GroupName = "presets", IsChecked = name == ViewModel.SelectedPreset, Tag = name };
+            item.Click += (s, _) => ViewModel.ApplyPreset((string)((FrameworkElement)s).Tag);
+            PresetMenu.Items.Add(item);
+        }
+        PresetMenu.Items.Add(new MenuFlyoutSeparator());
         var selected = !string.IsNullOrEmpty(ViewModel.SelectedPreset);
-        RenamePresetItem.IsEnabled = selected;
-        DeletePresetItem.IsEnabled = selected;
+        var save = new MenuFlyoutItem { Text = "Save current filters as preset…" };
+        save.Click += OnSavePreset;
+        var rename = new MenuFlyoutItem { Text = "Rename preset…", IsEnabled = selected };
+        rename.Click += OnRenamePreset;
+        var delete = new MenuFlyoutItem { Text = "Delete preset", IsEnabled = selected };
+        delete.Click += OnDeletePreset;
+        PresetMenu.Items.Add(save);
+        PresetMenu.Items.Add(rename);
+        PresetMenu.Items.Add(delete);
     }
 
     private async void OnSavePreset(object sender, RoutedEventArgs e)

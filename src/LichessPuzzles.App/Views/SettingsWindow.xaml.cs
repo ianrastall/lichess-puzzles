@@ -13,6 +13,19 @@ public sealed partial class SettingsWindow : Window
     private readonly MainWindow _main;
     private readonly bool _loading = true;
 
+    private static readonly double[] DelayChoices = [0.3, 0.5, 0.6, 0.8, 1, 1.5, 2];
+    private static readonly double[] EvaluationChoices = [0.5, 1, 2, 3, 5];
+
+    private static void FillSeconds(ComboBox box, double[] choices, double current)
+    {
+        foreach (var seconds in choices)
+        {
+            box.Items.Add($"{seconds.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)} s");
+        }
+        var nearest = choices.Select((v, i) => (Distance: Math.Abs(v - current), i)).MinBy(t => t.Distance).i;
+        box.SelectedIndex = nearest;
+    }
+
     public SettingsWindow(App app, MainWindow main)
     {
         _app = app;
@@ -38,13 +51,13 @@ public sealed partial class SettingsWindow : Window
         CoordinatesSwitch.IsOn = settings.ShowCoordinates;
         AnimationChoice.SelectedIndex = settings.MoveAnimation switch { "Off" => 0, "Fast" => 1, _ => 2 };
         ThemesSwitch.IsOn = settings.ShowThemesWhileSolving;
-        DelayBox.Value = Math.Clamp(settings.OpponentDelayMs / 1000.0, 0.3, 2);
+        FillSeconds(DelayBox, DelayChoices, settings.OpponentDelayMs / 1000.0);
         AutoNextSwitch.IsOn = settings.NextAfterCleanSolve;
         DataFolderText.Text = App.DataDirectory;
         EvaluationSwitch.IsOn = settings.EvaluationEnabled;
         EvaluationSolvingSwitch.IsOn = settings.EvaluationWhileSolving;
         EvaluationSolvingSwitch.IsEnabled = settings.EvaluationEnabled;
-        EvaluationTimeBox.Value = Math.Clamp(settings.EvaluationSeconds, 0.5, 5);
+        FillSeconds(EvaluationTimeBox, EvaluationChoices, settings.EvaluationSeconds);
         KeepDownloadSwitch.IsOn = settings.KeepDownload;
         CheckUpdatesSwitch.IsOn = settings.CheckForUpdatesAtStart;
         _loading = false;
@@ -124,11 +137,11 @@ public sealed partial class SettingsWindow : Window
         Save();
     }
 
-    private void OnDelayChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void OnDelayChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!double.IsNaN(args.NewValue))
+        if (DelayBox.SelectedIndex >= 0)
         {
-            _app.Settings.Value.OpponentDelayMs = (int)Math.Round(Math.Clamp(args.NewValue, 0.3, 2) * 1000);
+            _app.Settings.Value.OpponentDelayMs = (int)Math.Round(DelayChoices[DelayBox.SelectedIndex] * 1000);
             Save();
         }
     }
@@ -160,11 +173,11 @@ public sealed partial class SettingsWindow : Window
         }
     }
 
-    private void OnEvaluationTimeChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void OnEvaluationTimeChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!double.IsNaN(args.NewValue))
+        if (EvaluationTimeBox.SelectedIndex >= 0)
         {
-            _app.Settings.Value.EvaluationSeconds = Math.Clamp(args.NewValue, 0.5, 5);
+            _app.Settings.Value.EvaluationSeconds = EvaluationChoices[EvaluationTimeBox.SelectedIndex];
             Save();
         }
     }

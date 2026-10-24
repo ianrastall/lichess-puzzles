@@ -44,16 +44,14 @@
                 <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Puzzles" />
                 <ToggleSwitch x:Name="ThemesSwitch" Header="Show themes while solving" Toggled="OnThemesToggled" />
                 <TextBlock Style="{StaticResource ExplanationStyle}" Margin="0,-8,0,0" Text="Themes can give the solution away; when off they are shown once the puzzle ends." />
-                <NumberBox x:Name="DelayBox" Header="Opponent's move delay (seconds)" Minimum="0.3" Maximum="2" SmallChange="0.1" LargeChange="0.5"
-                           SpinButtonPlacementMode="Inline" ValidationMode="InvalidInputOverwritten" ValueChanged="OnDelayChanged" MaxWidth="240" HorizontalAlignment="Left" />
+                <ComboBox x:Name="DelayBox" Header="Opponent's move delay" SelectionChanged="OnDelayChanged" MinWidth="200" />
                 <ToggleSwitch x:Name="AutoNextSwitch" Header="Go to the next puzzle after a clean solve" Toggled="OnAutoNextToggled" />
 
                 <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Evaluation" />
                 <ToggleSwitch x:Name="EvaluationSwitch" Header="Enable evaluation" Toggled="OnEvaluationToggled" />
                 <TextBlock Style="{StaticResource ExplanationStyle}" Margin="0,-8,0,0" Text="A small built-in engine shows a score and its best line once the puzzle ends. It is a guide, not an authority." />
                 <ToggleSwitch x:Name="EvaluationSolvingSwitch" Header="Show while solving" Toggled="OnEvaluationSolvingToggled" />
-                <NumberBox x:Name="EvaluationTimeBox" Header="Time per position (seconds)" Minimum="0.5" Maximum="5" SmallChange="0.5" LargeChange="1"
-                           SpinButtonPlacementMode="Inline" ValidationMode="InvalidInputOverwritten" ValueChanged="OnEvaluationTimeChanged" MaxWidth="240" HorizontalAlignment="Left" />
+                <ComboBox x:Name="EvaluationTimeBox" Header="Time per position" SelectionChanged="OnEvaluationTimeChanged" MinWidth="200" />
 
                 <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Storage" />
                 <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Data folder" />

@@ -134,6 +134,18 @@ try
             analysis = core.GetAnalysis();
         }
         Check(analysis.HasResult && analysis.Mate == -1 && analysis.PvSan[0] == "Qg2#", $"analysis finds the mate ({analysis.Mate}, {string.Join(" ", analysis.PvSan)})");
+        foreach (var (fen, expected) in new[]
+        {
+            ("7k/6Q1/6K1/8/8/8/8/8 b - - 0 1", AnalysisOutcome.WhiteWins),
+            ("8/8/8/8/8/6k1/6q1/7K w - - 0 1", AnalysisOutcome.BlackWins),
+            ("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", AnalysisOutcome.Draw),
+        })
+        {
+            core.StartAnalysis(fen, TimeSpan.FromSeconds(1));
+            var terminal = core.GetAnalysis();
+            Check(terminal.HasResult && !terminal.Running && terminal.TerminalOutcome == expected && terminal.PvSan.Count == 0,
+                $"terminal evaluation: {expected}");
+        }
     }
 
     // A second core reopens the installed store.

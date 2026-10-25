@@ -74,7 +74,15 @@ pub(super) struct AnalysisState {
     fen: String,
     running: bool,
     info: Option<SearchInfo>,
+    terminal_outcome: Option<AnalysisOutcome>,
     stop: Arc<AtomicBool>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnalysisOutcome {
+    WhiteWins,
+    BlackWins,
+    Draw,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,6 +90,7 @@ pub struct AnalysisSnapshot {
     pub fen: String,
     pub running: bool,
     pub info: Option<SearchInfo>,
+    pub terminal_outcome: Option<AnalysisOutcome>,
 }
 
 fn now_ms() -> i64 {
@@ -370,6 +379,19 @@ impl Service {
         state.fen = fen.to_owned();
         state.running = true;
         state.info = None;
+        state.terminal_outcome = match board.status() {
+            cozy_chess::GameStatus::Ongoing => None,
+            cozy_chess::GameStatus::Drawn => Some(AnalysisOutcome::Draw),
+            cozy_chess::GameStatus::Won => Some(if board.side_to_move() == cozy_chess::Color::Black {
+                AnalysisOutcome::WhiteWins
+            } else {
+                AnalysisOutcome::BlackWins
+            }),
+        };
+        if state.terminal_outcome.is_some() {
+            state.running = false;
+            return Ok(());
+        }
         drop(state);
         let inner = self.inner.clone();
         std::thread::Builder::new()
@@ -393,7 +415,12 @@ impl Service {
 
     pub fn analysis(&self) -> AnalysisSnapshot {
         let state = self.inner.analysis.lock().unwrap();
-        AnalysisSnapshot { fen: state.fen.clone(), running: state.running, info: state.info.clone() }
+        AnalysisSnapshot {
+            fen: state.fen.clone(),
+            running: state.running,
+            info: state.info.clone(),
+            terminal_outcome: state.terminal_outcome,
+        }
     }
 
     pub fn stop_analysis(&self) {

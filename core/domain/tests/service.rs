@@ -341,6 +341,30 @@ fn export_replaces_the_destination_and_preserves_it_on_cancel_or_failure() {
 }
 
 #[test]
+fn analysis_reports_finished_positions_without_starting_a_search() {
+    use lichess_puzzles_core::service::AnalysisOutcome;
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = installed(dir.path());
+    // A terminal request also supersedes any analysis still running for an earlier position.
+    service.start_analysis(&service.load_puzzle("0000H", true).unwrap().view.fen, Duration::from_secs(5)).unwrap();
+    for (fen, expected) in [
+        ("7k/6Q1/6K1/8/8/8/8/8 b - - 0 1", AnalysisOutcome::WhiteWins),
+        ("8/8/8/8/8/6k1/6q1/7K w - - 0 1", AnalysisOutcome::BlackWins),
+        ("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", AnalysisOutcome::Draw),
+    ] {
+        service.start_analysis(fen, Duration::from_secs(1)).unwrap();
+        let result = service.analysis();
+        assert_eq!(result.fen, fen);
+        assert!(!result.running);
+        assert!(result.info.is_none());
+        assert_eq!(result.terminal_outcome, Some(expected));
+    }
+    service.start_analysis(&service.session(SessionCommand::Get).unwrap().view.fen, Duration::from_millis(50)).unwrap();
+    assert!(service.analysis().terminal_outcome.is_none(), "a new search clears the terminal outcome");
+}
+
+#[test]
 fn exports_and_analysis() {
     let dir = tempfile::tempdir().unwrap();
     let service = installed(dir.path());

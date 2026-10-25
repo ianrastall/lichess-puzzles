@@ -11,7 +11,7 @@
 
 mod practice;
 
-pub use practice::{AnalysisSnapshot, ExportSource, PlayersInfo, SessionResult};
+pub use practice::{AnalysisOutcome, AnalysisSnapshot, ExportSource, PlayersInfo, SessionResult};
 
 use std::collections::VecDeque;
 use std::fs;

@@ -236,6 +236,15 @@ message Analysis {
   repeated string pv_uci = 8;
   uint64 nodes = 9;
   uint32 elapsed_ms = 10;
+  // An already finished position; no search or principal variation is needed.
+  AnalysisOutcome terminal_outcome = 11;
+}
+
+enum AnalysisOutcome {
+  ANALYSIS_OUTCOME_UNSPECIFIED = 0;
+  ANALYSIS_OUTCOME_WHITE_WINS = 1;
+  ANALYSIS_OUTCOME_BLACK_WINS = 2;
+  ANALYSIS_OUTCOME_DRAW = 3;
 }
 
 message Done {}

@@ -237,6 +237,8 @@ public sealed partial class EvaluationViewModel(CoreHost host, JsonStore<AppSett
         _fen = fen;
         ScoreText = "…";
         LineText = DetailText = "";
+        WhiteShare = 0.5;
+        BarName = "Evaluation in progress";
         Running = true;
         var limit = TimeSpan.FromSeconds(Math.Clamp(s.EvaluationSeconds, 0.5, 5));
         _ = host.Try(core => core.StartAnalysis(fen, limit), "The evaluation could not start");
@@ -275,8 +277,28 @@ public sealed partial class EvaluationViewModel(CoreHost host, JsonStore<AppSett
             return;
         }
         Running = a.Running;
+        if (a.TerminalOutcome != AnalysisOutcome.Unspecified)
+        {
+            ScoreText = a.TerminalOutcome switch
+            {
+                AnalysisOutcome.WhiteWins => "Checkmate — White wins",
+                AnalysisOutcome.BlackWins => "Checkmate — Black wins",
+                _ => "Drawn position",
+            };
+            WhiteShare = a.TerminalOutcome switch { AnalysisOutcome.WhiteWins => 1, AnalysisOutcome.BlackWins => 0, _ => 0.5 };
+            BarName = $"Evaluation: {ScoreText}";
+            LineText = "";
+            DetailText = "The game has ended.";
+            return;
+        }
         if (!a.HasResult)
         {
+            if (!Running)
+            {
+                ScoreText = "No evaluation";
+                BarName = "No evaluation available";
+                DetailText = "The search ended before completing a depth.";
+            }
             return;
         }
         var whiteToMove = _fen.Split(' ').ElementAtOrDefault(1) != "b";

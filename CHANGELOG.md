@@ -12,6 +12,7 @@ The Jupiter rebuild of Lichess Puzzle Desktop, with a WinUI 3 shell and Rust cor
 - Choose the shared Jupiter dark, light or Windows theme, accent colour and board appearance.
 - Switching or deleting the current player restarts the board for the new player; prior attempts remain with their owner. Reopening a played puzzle is an unrated replay and creates no duplicate history.
 - Export cancellation and failures preserve existing destination files; temporary files use unique names and are cleaned up automatically.
+- Evaluation reports checkmate and drawn positions immediately, and distinguishes an interrupted search from a pending result. Hint and navigation controls remain available after a command finishes.
 - Deliver a self-contained x64 Windows installer with Start Menu and uninstall entries, a portable zip, a complete source bundle including Jupiter.UI, licence notices and SHA256 checksums.
 
 Requires Windows 11 24H2 or later, x64. The installer is unsigned. Existing Jupiter installations upgrade in place and retain puzzles, settings, players and history. The predecessor Lichess Puzzle Desktop installation and data remain separate; automatic migration is not included. The built-in engine is a training aid rather than an authoritative engine.

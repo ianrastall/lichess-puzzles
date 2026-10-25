@@ -106,9 +106,7 @@ Store format, filter fields and CLI commands are described in the [readme](../re
 
 ## Open questions
 
-- Whether a GitHub repository and public releases are wanted now, and whether the installer should be signed.
-- Whether to keep the downloaded `.zst` after a successful build (needed only to rebuild without downloading again). The app keeps it by default; **Settings > Storage** turns that off.
-- Piece set licensing (above).
+Resolved for 3.0.0 on 25 October 2026: Ian requested a public release at `ianrastall/lichess-puzzles`. The Jupiter rebuild keeps the predecessor's public Git history and releases. The installer remains unsigned. Downloads are kept by default and can be disabled in **Settings > Storage**. Merida's editable SVG source, attribution and GPL v2 text ship together; the artwork retains its separate licence. See the [release validation](release-3.0.0.md).
 
 ## Staged progression
 

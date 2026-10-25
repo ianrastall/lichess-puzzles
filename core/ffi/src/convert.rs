@@ -5,8 +5,8 @@ use lichess_puzzles_core::engine::Score;
 use lichess_puzzles_core::filter::{Counts, Filter};
 use lichess_puzzles_core::players::{HistoryEntry, Player, PuzzleResult};
 use lichess_puzzles_core::service::{
-    AnalysisSnapshot, Catalogue, CatalogueOpening, Event, EventAction, EventLevel, OperationKind, OperationStatus,
-    PlayersInfo, SessionResult, Status,
+    AnalysisOutcome, AnalysisSnapshot, Catalogue, CatalogueOpening, Event, EventAction, EventLevel, OperationKind,
+    OperationStatus, PlayersInfo, SessionResult, Status,
 };
 use lichess_puzzles_core::session::{MoveOutcome, SessionState};
 use lichess_puzzles_core::source::RemoteVersion;
@@ -281,6 +281,14 @@ pub fn history_to_message(entries: &[HistoryEntry]) -> m::History {
 
 pub fn analysis_to_message(a: &AnalysisSnapshot) -> m::Analysis {
     let mut message = m::Analysis { fen: a.fen.clone(), running: a.running, ..Default::default() };
+    if let Some(outcome) = a.terminal_outcome {
+        message.has_result = true;
+        message.terminal_outcome = match outcome {
+            AnalysisOutcome::WhiteWins => m::AnalysisOutcome::WhiteWins,
+            AnalysisOutcome::BlackWins => m::AnalysisOutcome::BlackWins,
+            AnalysisOutcome::Draw => m::AnalysisOutcome::Draw,
+        } as i32;
+    }
     if let Some(info) = &a.info {
         message.has_result = true;
         message.depth = info.depth;

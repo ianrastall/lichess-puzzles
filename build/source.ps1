@@ -7,9 +7,21 @@ try {
     $manifest = [Collections.Generic.List[string]]::new()
     foreach ($name in 'lichess-puzzles', 'jupiter-ui') {
         $repo = if ($name -eq 'lichess-puzzles') { $root } else { Join-Path (Split-Path -Parent $root) $name }
-        $files = git -C $repo ls-files
-        if ($LASTEXITCODE -ne 0) { throw "Cannot enumerate $name source." }
-        $commit = git -C $repo rev-parse HEAD
+        if (Test-Path -LiteralPath (Join-Path $repo '.git')) {
+            $files = git -C $repo ls-files
+            if ($LASTEXITCODE -ne 0) { throw "Cannot enumerate $name source." }
+            $commit = git -C $repo rev-parse HEAD
+        }
+        else {
+            # Release archives contain no .git directory. Repackage only files from their manifest.
+            $originalManifest = Join-Path (Split-Path -Parent $root) 'SOURCE-MANIFEST.txt'
+            if (-not (Test-Path -LiteralPath $originalManifest)) { throw "Cannot find Git metadata or SOURCE-MANIFEST.txt for $name." }
+            $prefix = "$name/"
+            $files = Get-Content -LiteralPath $originalManifest | Where-Object { $_ -match '^[0-9a-f]{64}  ' } |
+                ForEach-Object { $_.Substring(66) } | Where-Object { $_.StartsWith($prefix) } |
+                ForEach-Object { $_.Substring($prefix.Length) }
+            $commit = 'release source snapshot'
+        }
         $manifest.Add("$name base commit: $commit (SHA256 entries identify the packaged working files)")
         foreach ($file in $files) {
             $source = Join-Path $repo $file
@@ -21,6 +33,10 @@ try {
         }
     }
     Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination (Join-Path $stage 'jupiter-ui/LICENSE')
+    $uiLicense = Join-Path $stage 'jupiter-ui/LICENSE'
+    if (-not ($manifest | Where-Object { $_.EndsWith('  jupiter-ui/LICENSE') })) {
+        $manifest.Add("$((Get-FileHash -LiteralPath $uiLicense -Algorithm SHA256).Hash.ToLowerInvariant())  jupiter-ui/LICENSE")
+    }
     [IO.File]::WriteAllLines((Join-Path $stage 'SOURCE-MANIFEST.txt'), $manifest)
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $OutputPath -Force
 }

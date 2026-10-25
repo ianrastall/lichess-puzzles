@@ -32,4 +32,6 @@ Checked on 25 October 2026 with a separate 13-puzzle fixture folder, leaving the
 - Production puzzle store and player database hashes are identical before and after upgrade testing.
 - Source archive hashes verify for all 136 files. Extracted source repackages using its manifest without requiring Git metadata.
 
-Remaining final smoke checks: terminal evaluation display, refreshed Players menu, and launch through the installed Start shortcut.
+Final package checks also pass: the completed puzzle displays **Checkmate — Black wins** with a terminal evaluation bar; adding and selecting a second player restarts the board at 1500 with no played puzzles; the Players menu has exactly one New player command after repeated refreshes and switching players.
+
+Launching the installed **Lichess Puzzles.lnk** Start shortcut opens the production 6,157,341-puzzle store, restores the user's open puzzle and retains the existing player rating and five recorded attempts. The app is left open on that production workspace after verification.

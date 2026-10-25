@@ -2,7 +2,7 @@
 
 Working specification · 24 October 2026 · Stage 2 of the [project brief](project-brief.md)
 
-This document defines the window's regions, menus, states and keyboard behaviour for the WinUI 3 shell. It follows [Jupiter style standard 1.0](../../_standards/jupiter-style-standard_v1-0.md), through the shared [Jupiter.UI](../../jupiter-ui/readme.md) library, and the [UI package proposal](../../_standards/jupiter-ui-package_proposal.md). Departures are listed in [jupiter-exceptions.md](jupiter-exceptions.md). The arrangement is the predecessor's (filters left, board centre, puzzle right), adjusted to Jupiter conventions. The [wireframe](workbench-wireframe.svg) is illustrative: it fixes regions and their contents, not exact colours or spacing.
+This document defines the window's regions, menus, states and keyboard behaviour for the WinUI 3 shell. It follows [Jupiter style standard 1.0](../../_standards/jupiter-style-standard.md), through the shared [Jupiter.UI](../../jupiter-ui/readme.md) library, and the [UI package proposal](../../_standards/jupiter-ui-package_proposal.md). Departures are listed in [jupiter-exceptions.md](jupiter-exceptions.md). The arrangement is the predecessor's (filters left, board centre, puzzle right), adjusted to Jupiter conventions. The [wireframe](workbench-wireframe.svg) is illustrative: it fixes regions and their contents, not exact colours or spacing.
 
 ![Wireframe of the solving state: filter pane, board with Black to move, puzzle pane and status bar](workbench-wireframe.svg)
 

@@ -1,6 +1,6 @@
 # Jupiter style exceptions
 
-Lichess Puzzles follows [Jupiter style standard 1.0](../../_standards/jupiter-style-standard_v1-0.md) through the shared [Jupiter.UI](../../jupiter-ui/readme.md) library. The style check runs on every build with the default severity, Error, and the XAML has no `jupiter-allow` markers. These are the recorded departures.
+Lichess Puzzles follows [Jupiter style standard 1.0](../../_standards/jupiter-style-standard.md) through the shared [Jupiter.UI](../../jupiter-ui/readme.md) library. The style check runs on every build with the default severity, Error, and the XAML has no `jupiter-allow` markers. These are the recorded departures.
 
 | Rule | Where | Departure | Reason | Recorded |
 | --- | --- | --- | --- | --- |

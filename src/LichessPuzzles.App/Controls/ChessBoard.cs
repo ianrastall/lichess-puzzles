@@ -172,7 +172,7 @@ public sealed partial class ChessBoard : UserControl
         _lastFrom.Fill = _lastTo.Fill = new SolidColorBrush(Color.FromArgb(110, accent.R, accent.G, accent.B));
         _selected.Stroke = new SolidColorBrush(accent);
         _hint.Stroke = new SolidColorBrush(accent);
-        _cursor.Stroke = Jupiter.UI.JupiterTheme.Brush("JupiterFocusStrokeBrush");
+        _cursor.Stroke = Jupiter.UI.JupiterTheme.Brush("JupiterFocusStrokeBrush", ActualTheme);
         _check.Fill = new SolidColorBrush(Color.FromArgb(150, 0xE9, 0x6A, 0x5E));
     }
 
@@ -601,8 +601,8 @@ public sealed partial class ChessBoard : UserControl
         }
         _promotion.Child = panel;
         // The promotion choice is a flyout: raised surface, separator outline, overlay radius (standard 8).
-        _promotion.Background = Jupiter.UI.JupiterTheme.Brush("JupiterRaisedBrush");
-        _promotion.BorderBrush = Jupiter.UI.JupiterTheme.Brush("JupiterSeparatorBrush");
+        _promotion.Background = Jupiter.UI.JupiterTheme.Brush("JupiterRaisedBrush", ActualTheme);
+        _promotion.BorderBrush = Jupiter.UI.JupiterTheme.Brush("JupiterSeparatorBrush", ActualTheme);
         _promotion.BorderThickness = new Thickness(1);
         _promotion.CornerRadius = (CornerRadius)Jupiter.UI.JupiterTheme.Find("OverlayCornerRadius");
         var (col, row) = ScreenCell(to);

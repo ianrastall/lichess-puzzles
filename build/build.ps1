@@ -76,19 +76,28 @@ try {
     Copy-Item (Join-Path $target 'release/lichess-puzzles.exe') $appDir
     Copy-Item (Join-Path $VcRuntimeDirectory '*.dll') $appDir
     Copy-Item (Join-Path $root 'LICENSE') $appDir
+    & (Join-Path $PSScriptRoot 'notices.ps1') -OutputPath (Join-Path $appDir 'THIRD-PARTY-NOTICES.txt')
 
-    foreach ($file in 'LichessPuzzles.exe', 'LichessPuzzles.pri', 'lichess_puzzles_ffi.dll', 'lichess-puzzles.exe', 'vcruntime140.dll', 'Assets/app.ico', 'Assets/pieces/wK.svg') {
+    foreach ($file in 'LichessPuzzles.exe', 'LichessPuzzles.pri', 'lichess_puzzles_ffi.dll', 'lichess-puzzles.exe', 'vcruntime140.dll', 'Assets/app.ico', 'Assets/pieces/wK.svg', 'Assets/pieces/COPYING.txt', 'THIRD-PARTY-NOTICES.txt') {
         if (-not (Test-Path (Join-Path $appDir $file))) { throw "Published folder is missing $file." }
     }
 
     $zip = Join-Path $dist "LichessPuzzles-$version-win-x64.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
     Compress-Archive -Path (Join-Path $appDir '*') -DestinationPath $zip
+    $sourceZip = Join-Path $dist "LichessPuzzles-$version-source.zip"
+    & (Join-Path $PSScriptRoot 'source.ps1') -OutputPath $sourceZip
     if (-not $PortableOnly) {
         Invoke-Step 'build installer' { & $InnoCompiler /Qp "/DAppVersion=$version" (Join-Path $PSScriptRoot 'installer.iss') }
         Write-Host "Installer: $(Join-Path $dist "LichessPuzzles-$version-win-x64-setup.exe")" -ForegroundColor Green
     }
     Write-Host "Published $appDir and $zip" -ForegroundColor Green
+    $artifacts = @($zip, $sourceZip)
+    if (-not $PortableOnly) { $artifacts += Join-Path $dist "LichessPuzzles-$version-win-x64-setup.exe" }
+    $checksums = $artifacts | ForEach-Object {
+        "$((Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_))"
+    }
+    [IO.File]::WriteAllLines((Join-Path $dist "LichessPuzzles-$version-SHA256SUMS.txt"), [string[]]$checksums)
 }
 finally {
     Pop-Location

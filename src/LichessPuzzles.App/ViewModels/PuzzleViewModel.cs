@@ -286,7 +286,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
     [RelayCommand]
     public async Task ShowSolutionAsync()
     {
-        if (!CanShowSolution)
+        if (!CanShowSolution || _busy)
         {
             return;
         }
@@ -409,6 +409,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
         finally
         {
             _busy = false;
+            UpdateCommands();
         }
     }
 

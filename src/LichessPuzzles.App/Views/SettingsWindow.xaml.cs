@@ -42,6 +42,8 @@ public sealed partial class SettingsWindow : Window
             presenter.PreferredMinimumHeight = (int)(480 * scale);
         }
         _app.Accent.Attach(Root);
+        _app.Theme.Attach(this);
+        ThemeSetting.Service = _app.Theme;
         AccentSetting.Service = _app.Accent;
 
         var settings = _app.Settings.Value;

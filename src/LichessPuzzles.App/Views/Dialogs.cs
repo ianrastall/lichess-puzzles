@@ -11,15 +11,19 @@ namespace Jupiter.LichessPuzzles.App.Views;
 /// <summary>The app's small dialogs, built in code.</summary>
 public static class Dialogs
 {
-    private static ContentDialog Create(XamlRoot root, string title, object content, string close = "Close") => new()
+    private static ContentDialog Create(XamlRoot root, string title, object content, string close = "Close")
     {
-        XamlRoot = root,
-        Title = title,
-        Content = content,
-        CloseButtonText = close,
-        DefaultButton = ContentDialogButton.Close,
-        RequestedTheme = ElementTheme.Dark,
-    };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = root,
+            Title = title,
+            Content = content,
+            CloseButtonText = close,
+            DefaultButton = ContentDialogButton.Close,
+        };
+        App.Current.Theme.Attach(dialog);
+        return dialog;
+    }
 
     public static async Task<bool> ConfirmAsync(XamlRoot root, string title, string message, string action)
     {
@@ -146,7 +150,7 @@ public static class Dialogs
     public static async Task ShowGoToPuzzleAsync(XamlRoot root, PuzzleViewModel puzzle)
     {
         var box = new TextBox { Header = "Puzzle id or lichess.org link", PlaceholderText = "00sHx" };
-        var error = new TextBlock { Visibility = Visibility.Collapsed, Style = JupiterTheme.Style("JupiterCaptionTextStyle"), Foreground = JupiterTheme.Brush("JupiterErrorBrush") };
+        var error = new TextBlock { Visibility = Visibility.Collapsed, Style = JupiterTheme.Style("JupiterCaptionTextStyle"), Foreground = JupiterTheme.Brush("JupiterErrorBrush", App.Current.Theme.Resolved) };
         var panel = new StackPanel { Spacing = 8, MinWidth = 320 };
         panel.Children.Add(box);
         panel.Children.Add(error);

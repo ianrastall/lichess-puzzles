@@ -55,6 +55,8 @@ public partial class App : Application
 
     public AccentService Accent { get; private set; } = null!;
 
+    public ThemeService Theme { get; private set; } = null!;
+
     public MainWindow Window { get; private set; } = null!;
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
@@ -80,7 +82,10 @@ public partial class App : Application
         Player.Changed += () => _ = OnPlayerChangedAsync();
 
         Accent = new AccentService(new AccentPreferences(Settings));
+        Theme = new ThemeService(new ThemePreferences(Settings));
         Window = new MainWindow(this);
+        Theme.Attach(Window);
+        Theme.Changed += Window.OnAccentChanged;
         Accent.Attach(Window.RootElement);
         Accent.Changed += Window.OnAccentChanged;
         Window.Activate();
@@ -237,6 +242,14 @@ public partial class App : Application
             return;
         }
         _playerKey = key;
+        if (Puzzle.HasPuzzle)
+        {
+            var error = await Puzzle.LoadAsync(Puzzle.PuzzleId);
+            if (error is not null)
+            {
+                Status.Report(error);
+            }
+        }
         await Filter.ApplyAsync();
         if (Window?.ShowingHistory == true)
         {

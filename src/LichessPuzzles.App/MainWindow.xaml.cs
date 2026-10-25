@@ -93,7 +93,7 @@ public sealed partial class MainWindow : Window, IBoardView
         InfoBarSeverity.Warning => "JupiterWarningBrush",
         InfoBarSeverity.Error => "JupiterErrorBrush",
         _ => "JupiterInfoBrush",
-    });
+    }, _app.Theme.Resolved);
 
     // IBoardView ----------------------------------------------------------------------------------
 
@@ -612,6 +612,8 @@ public sealed partial class MainWindow : Window, IBoardView
                 {
                     await _app.Host.Try(c => c.ClearHistory(current.Id), "The history could not be cleared");
                     await player.RefreshAsync();
+                    await _app.History.RefreshAsync();
+                    await _app.Filter.ApplyAsync();
                 }
                 break;
             }

@@ -257,6 +257,90 @@ fn ratings_history_and_played_puzzles() {
 }
 
 #[test]
+fn switching_players_restarts_the_puzzle_and_keeps_attempts_with_their_owner() {
+    let dir = tempfile::tempdir().unwrap();
+    let service = installed(dir.path());
+    let original = service.players(0).unwrap().current;
+    let guest = service.add_player("Guest").unwrap();
+    let line = service.load_puzzle("00sJ9", false).unwrap().view.puzzle.moves;
+    service.session(SessionCommand::PlayOpponent).unwrap();
+    service.session(SessionCommand::MakeMove(line[1].clone())).unwrap();
+
+    // Invalid switches preserve the active attempt.
+    assert!(service.set_current_player(-1).is_err());
+    assert_eq!(service.session(SessionCommand::Get).unwrap().view.state, SessionState::ReplyPending);
+    service.set_current_player(guest.id).unwrap();
+    let restarted = service.session(SessionCommand::Get).unwrap();
+    assert_eq!(restarted.view.state, SessionState::OpponentToMove);
+    assert!(restarted.rated);
+    assert!(service.history(10).unwrap().is_empty());
+    solve(&service);
+    assert_eq!(service.history(10).unwrap()[0].result, PuzzleResult::Solved);
+    assert_eq!(service.players(0).unwrap().players.iter().find(|p| p.id == guest.id).unwrap().games, 1);
+
+    service.set_current_player(original).unwrap();
+    let history = service.history(10).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].result, PuzzleResult::Failed);
+    let replay = service.session(SessionCommand::Get).unwrap();
+    assert!(replay.view.replay && !replay.rated);
+    solve(&service);
+    assert_eq!(service.history(10).unwrap(), history, "replays must not rewrite or duplicate history");
+}
+
+#[test]
+fn deleting_the_active_player_transfers_the_board_to_the_remaining_player() {
+    let dir = tempfile::tempdir().unwrap();
+    let service = installed(dir.path());
+    let original = service.players(0).unwrap().current;
+    let guest = service.add_player("Guest").unwrap();
+    service.load_puzzle("0000H", false).unwrap();
+    service.session(SessionCommand::PlayOpponent).unwrap();
+    service.delete_player(original).unwrap();
+    assert_eq!(service.players(0).unwrap().current, guest.id);
+    assert_eq!(service.session(SessionCommand::Get).unwrap().view.state, SessionState::OpponentToMove);
+    solve(&service);
+    assert_eq!(service.history(10).unwrap()[0].player_id, guest.id);
+    assert!(service.poll_events(100).is_empty(), "no save should target the deleted player");
+}
+
+#[test]
+fn export_replaces_the_destination_and_preserves_it_on_cancel_or_failure() {
+    use lichess_puzzles_core::export::{self, ExportError};
+    use lichess_puzzles_core::store::Store;
+    use std::sync::atomic::AtomicBool;
+
+    let dir = tempfile::tempdir().unwrap();
+    let _service = installed(dir.path());
+    let store = Store::open(dir.path().join("puzzles.store")).unwrap();
+    let path = dir.path().join("export.csv");
+    let sidecar = dir.path().join("export.csv.partial");
+    std::fs::write(&path, "existing export").unwrap();
+    std::fs::write(&sidecar, "unrelated file").unwrap();
+    let cancelled = AtomicBool::new(true);
+    assert_eq!(
+        export::export(&store, &[0], ExportFormat::Csv, false, &path, &mut |_| {}, &cancelled),
+        Err(ExportError::Cancelled)
+    );
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "existing export");
+    let running = AtomicBool::new(false);
+    assert_eq!(export::export(&store, &[0], ExportFormat::Csv, false, &path, &mut |_| {}, &running).unwrap(), 1);
+    assert!(std::fs::read_to_string(&path).unwrap().starts_with(export::CSV_HEADER));
+    assert_eq!(std::fs::read_to_string(&sidecar).unwrap(), "unrelated file");
+    let folder = dir.path().join("folder");
+    std::fs::create_dir(&folder).unwrap();
+    assert!(export::export(&store, &[0], ExportFormat::Csv, false, &folder, &mut |_| {}, &running).is_err());
+    assert_eq!(
+        std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".tmp"))
+            .count(),
+        0
+    );
+}
+
+#[test]
 fn exports_and_analysis() {
     let dir = tempfile::tempdir().unwrap();
     let service = installed(dir.path());

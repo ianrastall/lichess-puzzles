@@ -7,7 +7,6 @@
 //! CSV: the Lichess column layout. EPD: the solver's position with `bm` (the first solution move)
 //! and `id`.
 
-use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -227,11 +226,10 @@ pub fn export(
     cancel: &AtomicBool,
 ) -> Result<u64, ExportError> {
     let io = |e: std::io::Error| ExportError::Io(e.to_string());
-    let mut temp = path.as_os_str().to_owned();
-    temp.push(".partial");
-    let temp = std::path::PathBuf::from(temp);
-    let result = (|| {
-        let mut out = BufWriter::with_capacity(1 << 20, File::create(&temp).map_err(io)?);
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(io)?;
+    let written = {
+        let mut out = BufWriter::with_capacity(1 << 20, temp.as_file_mut());
         if format == ExportFormat::Csv {
             writeln!(out, "{CSV_HEADER}").map_err(io)?;
         }
@@ -256,18 +254,13 @@ pub fn export(
         }
         out.flush().map_err(io)?;
         progress(indices.len() as u64);
-        Ok(written)
-    })();
-    match result {
-        Ok(written) => {
-            fs::rename(&temp, path).map_err(io)?;
-            Ok(written)
-        }
-        Err(e) => {
-            let _ = fs::remove_file(&temp);
-            Err(e)
-        }
+        written
+    };
+    if cancel.load(Ordering::Relaxed) {
+        return Err(ExportError::Cancelled);
     }
+    temp.persist(path).map_err(|e| io(e.error))?;
+    Ok(written)
 }
 
 #[cfg(test)]

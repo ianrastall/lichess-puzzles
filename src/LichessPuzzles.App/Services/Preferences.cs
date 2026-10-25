@@ -11,6 +11,7 @@ public sealed class AppSettings
     public int Version { get; set; } = CurrentVersion;
 
     // Appearance
+    public string? Theme { get; set; } = "dark";
     public bool UseCustomAccent { get; set; }
     /// <summary>#RRGGBB, or null until a custom color is chosen.</summary>
     public string? CustomAccent { get; set; }

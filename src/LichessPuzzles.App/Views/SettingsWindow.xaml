@@ -14,6 +14,7 @@
                 <StackPanel Spacing="12">
                     <TextBlock Style="{StaticResource JupiterSectionHeadingTextStyle}" Text="Appearance" />
                     <StackPanel Spacing="16">
+                        <jupiter:ThemeSetting x:Name="ThemeSetting" />
                         <jupiter:AccentColorSetting x:Name="AccentSetting" />
                         <ComboBox x:Name="BoardThemeBox" Header="Board" SelectionChanged="OnBoardThemeChanged" MinWidth="200" />
                         <ToggleSwitch x:Name="CoordinatesSwitch" Header="Coordinates" Toggled="OnCoordinatesToggled" />

@@ -27,6 +27,7 @@
     <Content Include="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\pieces\*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\pieces\README.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)licenses\GPL-2.0.txt" Link="Assets\pieces\COPYING.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 

@@ -2,16 +2,18 @@
 
 A Windows desktop app for downloading, filtering and playing the [Lichess puzzle database](https://database.lichess.org/#puzzles) offline. Part of the Jupiter family.
 
-Status: stages 1 to 5 of the [project brief](docs/project-brief.md) are built. The app downloads, filters and plays the puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer.
+Version 3.0.0 is the Jupiter rebuild of Lichess Puzzle Desktop. The app downloads, filters and plays puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer. See the [release notes](CHANGELOG.md) and [validation record](docs/release-3.0.0.md).
+
+[Download the Windows installer](https://github.com/ianrastall/lichess-puzzles/releases/latest).
 
 - [Project brief](docs/project-brief.md): decisions, source data, workflows, measurements and open questions
 - [Workbench layout](docs/workbench-layout.md): regions, menus, states and keyboard behaviour for the desktop shell
 - [Source map](docs/source-map.json): related folders and their dispositions
 - [Jupiter style exceptions](docs/jupiter-exceptions.md): recorded departures from the style standard
 
-Follows Jupiter style standard 1.0 through the shared [Jupiter.UI](../jupiter-ui/readme.md) library, which must sit beside this repository (`D:\jupiter\jupiter-ui`) to build.
+Follows Jupiter style standard 1.1 through the shared [Jupiter.UI](../jupiter-ui/readme.md) library, which must sit beside this repository to build. The release's **source.zip** includes both folders and a SHA256 source manifest.
 
-This is a fresh repository. The previous [Lichess Puzzle Desktop](<D:/dev/proj/lichess-puzzle-desktop>) remains in place as a reference.
+The rebuild and predecessor histories are both retained in this repository. The older Lichess Puzzle Desktop installation and its `%LOCALAPPDATA%\LichessPuzzleDesktop` data stay separate; 3.0 does not migrate that data. Existing Jupiter Lichess Puzzles installations upgrade in place and keep their data.
 
 ## Desktop app
 
@@ -22,6 +24,8 @@ On first run the app offers to download the Lichess puzzle database (about 300 M
 Each player has a Glicko-2 puzzle rating starting at 1500 ± 350; a `?` marks it provisional while the deviation is above 110. With **Rated** on, your first attempt at a puzzle is a game against it, using its rating and deviation from the database. The first wrong move, hint or solution makes it a loss, and a solve without them a win. Leaving a puzzle after playing in it counts as a loss. Replays are not rated. **History** lists every attempt.
 
 **Evaluation** (off by default; **View** or **Settings**) runs a small built-in engine after the puzzle ends, or while solving if you choose. It shows a score, best line and an evaluation bar. It is a guide, not an authority.
+
+**Settings > Appearance > Theme** offers Dark, Light, and Use Windows setting. The choice applies immediately to the main window, settings and dialogs, and is saved with the accent and board settings.
 
 ## Command line
 
@@ -74,7 +78,7 @@ Requirements: Rust 1.99.1 (pinned in `rust-toolchain.toml`), .NET SDK 10.0.1xx (
 pwsh build/build.ps1
 ```
 
-This formats, lints and tests the Rust workspace, runs the C# interop checks, publishes `dist/LichessPuzzles` and `dist/LichessPuzzles-<version>-win-x64.zip` (including the CLI), and compiles the installer with Inno Setup 6. `-SkipChecks` publishes only; `-PortableOnly` skips the installer.
+This checks formatting, lints and tests the Rust workspace, runs the C# interop checks, publishes `dist/LichessPuzzles` and `dist/LichessPuzzles-<version>-win-x64.zip` (including the CLI), and compiles the installer with Inno Setup 6. It also writes a source archive containing the shared UI library, dependency licence notices and `LichessPuzzles-<version>-SHA256SUMS.txt`. Git is required for source packaging; Inno Setup 6 is required for the installer. `-SkipChecks` publishes only; `-PortableOnly` skips the installer.
 
 ```text
 core/domain                    Rust domain core: download, store, filters, session, service
@@ -91,6 +95,7 @@ build                          build script, native build targets, icon script
 - Code: MIT, see `LICENSE`.
 - Puzzles: the Lichess puzzle database, released under [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
 - Chess rules: [cozy-chess](https://github.com/analog-hors/cozy-chess), MIT.
-- Pieces: Merida by Armando Hernandez Marroquin, from [lichess-org/lila](https://github.com/lichess-org/lila/tree/master/public/piece/merida), GPL version 2 or later. Distributing the app with these files means complying with that licence; see the brief's open questions.
+- Pieces: Merida by Armando Hernandez Marroquin, from [lichess-org/lila](https://github.com/lichess-org/lila/tree/master/public/piece/merida), GPL version 2 or later. The editable SVG artwork, attribution and full licence ship in `Assets/pieces`; the artwork retains its separate licence.
+- Dependency licences and copyright notices: `THIRD-PARTY-NOTICES.txt` in the installed or portable folder.
 - Theme descriptions are written for this app.
 - Evaluation: piece-square tables from Tomasz Michniewski's "simplified evaluation function".

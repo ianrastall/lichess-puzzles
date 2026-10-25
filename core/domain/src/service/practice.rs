@@ -159,12 +159,17 @@ impl Service {
 
     fn start_session(&self, store: &Store, index: usize, replay: bool) -> Result<SessionResult, ServiceError> {
         let puzzle = store.puzzle(index).map_err(ServiceError::Store)?;
-        let mut session = Session::new(puzzle).map_err(ServiceError::Session)?;
-        session.set_replay(replay);
         let mut guard = self.inner.session.lock().unwrap();
         if let Some(previous) = guard.as_mut() {
             self.inner.abandon(previous);
         }
+        let replay = replay || {
+            let players = self.inner.players.lock().unwrap();
+            let player = players.current().map_err(player_error)?.id;
+            players.has_played(player, &puzzle.id).map_err(player_error)?
+        };
+        let mut session = Session::new(puzzle).map_err(ServiceError::Session)?;
+        session.set_replay(replay);
         let tracker = self.inner.new_tracker(&session, replay)?;
         let active = Active { session, tracker };
         let result = active.result(None);
@@ -247,7 +252,23 @@ impl Service {
     }
 
     pub fn set_current_player(&self, id: i64) -> Result<(), ServiceError> {
-        self.inner.players.lock().unwrap().set_current(id).map_err(player_error)
+        let mut guard = self.inner.session.lock().unwrap();
+        {
+            let players = self.inner.players.lock().unwrap();
+            if players.current().map_err(player_error)?.id == id {
+                return Ok(());
+            }
+            players.set_current(id).map_err(player_error)?;
+        }
+        if let Some(active) = guard.as_mut() {
+            self.inner.abandon(active);
+            let mut session = Session::new(active.session.puzzle().clone()).map_err(ServiceError::Session)?;
+            let tracker = self.inner.new_tracker(&session, false)?;
+            session.set_replay(!tracker.recorded);
+            *active = Active { session, tracker };
+        }
+        *self.inner.played.lock().unwrap() = None;
+        Ok(())
     }
 
     pub fn add_player(&self, name: &str) -> Result<Player, ServiceError> {
@@ -259,7 +280,16 @@ impl Service {
     }
 
     pub fn delete_player(&self, id: i64) -> Result<(), ServiceError> {
+        let mut guard = self.inner.session.lock().unwrap();
         self.inner.players.lock().unwrap().delete(id).map_err(player_error)?;
+        if let Some(active) = guard.as_mut()
+            && active.tracker.player == id
+        {
+            let mut session = Session::new(active.session.puzzle().clone()).map_err(ServiceError::Session)?;
+            let tracker = self.inner.new_tracker(&session, false)?;
+            session.set_replay(!tracker.recorded);
+            *active = Active { session, tracker };
+        }
         *self.inner.played.lock().unwrap() = None;
         Ok(())
     }
@@ -310,7 +340,6 @@ impl Service {
         }
         let total = indices.len() as u64;
         self.start_operation(OperationKind::Export, move |inner, op| {
-            let Some(store) = inner.current_store() else { return };
             op.update(|s| s.total = Some(total));
             let mut progress = |n: u64| op.update(|s| s.done = n);
             match export::export(&store, &indices, format, player_start, &path, &mut progress, &op.cancel) {
@@ -393,7 +422,7 @@ impl Inner {
         Ok(Tracker {
             player,
             rated: !replay && !played && self.rated.load(Ordering::Relaxed),
-            recorded: !replay,
+            recorded: !replay && !played,
             entry_id: 0,
             rating_change: None,
             settled: false,

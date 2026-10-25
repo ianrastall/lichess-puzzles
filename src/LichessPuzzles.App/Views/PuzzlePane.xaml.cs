@@ -72,7 +72,7 @@ public sealed partial class PuzzlePane : UserControl
 
     /// <summary>The move on the board is the selection in the move list (standard 3.2).</summary>
     public static Brush CurrentBackground(bool current) => current
-        ? Jupiter.UI.JupiterTheme.Brush("JupiterSelectedBrush")
+        ? Jupiter.UI.JupiterTheme.Brush("JupiterSelectedBrush", App.Current.Theme.Resolved)
         : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
 
     public static string HistoryTooltip(string mistakes, string hints, string time) => $"Mistakes {mistakes} · hints {hints} · time {time}";

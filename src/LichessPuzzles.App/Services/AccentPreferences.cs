@@ -23,3 +23,15 @@ public sealed class AccentPreferences(JsonStore<AppSettings> settings) : IAccent
 
     public void Save() => settings.Save();
 }
+
+/// <summary>Keeps the shared dark, light or Windows theme choice in settings.json.</summary>
+public sealed class ThemePreferences(JsonStore<AppSettings> settings) : IThemePreferences
+{
+    public string? Theme
+    {
+        get => settings.Value.Theme;
+        set => settings.Value.Theme = value;
+    }
+
+    public void Save() => settings.Save();
+}

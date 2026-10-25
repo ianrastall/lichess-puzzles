@@ -70,8 +70,9 @@ public sealed partial class PuzzlePane : UserControl
     /// <summary>The "…" shown in the White column when a row starts with Black's move.</summary>
     public static Visibility Placeholder(MoveCell? cell) => cell is { IsMove: false } ? Visibility.Visible : Visibility.Collapsed;
 
+    /// <summary>The move on the board is the selection in the move list (standard 3.2).</summary>
     public static Brush CurrentBackground(bool current) => current
-        ? (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"]
+        ? Jupiter.UI.JupiterTheme.Brush("JupiterSelectedBrush")
         : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
 
     public static string HistoryTooltip(string mistakes, string hints, string time) => $"Mistakes {mistakes} · hints {hints} · time {time}";

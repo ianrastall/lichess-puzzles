@@ -3,6 +3,7 @@ using Jupiter.LichessPuzzles.App.Services;
 using Jupiter.LichessPuzzles.App.ViewModels;
 using Jupiter.LichessPuzzles.Interop;
 using Jupiter.LichessPuzzles.Messages;
+using Jupiter.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
@@ -78,7 +79,7 @@ public partial class App : Application
         Puzzle.PositionShown += (fen, finished) => Evaluation.Show(fen, finished);
         Player.Changed += () => _ = OnPlayerChangedAsync();
 
-        Accent = new AccentService(Settings, dispatcher);
+        Accent = new AccentService(new AccentPreferences(Settings));
         Window = new MainWindow(this);
         Accent.Attach(Window.RootElement);
         Accent.Changed += Window.OnAccentChanged;

@@ -1,6 +1,7 @@
 using Jupiter.LichessPuzzles.App.Services;
 using Jupiter.LichessPuzzles.App.ViewModels;
 using Jupiter.LichessPuzzles.Messages;
+using Jupiter.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
@@ -22,7 +23,8 @@ public static class Dialogs
 
     public static async Task<bool> ConfirmAsync(XamlRoot root, string title, string message, string action)
     {
-        var dialog = Create(root, title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, "Keep working");
+        // Standard section 10: the close button is "Cancel" and is the default for a destructive action.
+        var dialog = Create(root, title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, "Cancel");
         dialog.PrimaryButtonText = action;
         dialog.DefaultButton = ContentDialogButton.Close;
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
@@ -36,7 +38,7 @@ public static class Dialogs
         Func<string, string?>? check = null, bool blockOnWarning = false, string? problem = null)
     {
         var box = new TextBox { Header = label, Text = initial, MaxLength = 40 };
-        var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Style = (Style)Application.Current.Resources["ExplanationStyle"] };
+        var note = new TextBlock { Visibility = Visibility.Collapsed, Style = JupiterTheme.Style("JupiterCaptionTextStyle") };
         var panel = new StackPanel { Spacing = 8, MinWidth = 320 };
         panel.Children.Add(box);
         panel.Children.Add(note);
@@ -73,7 +75,7 @@ public static class Dialogs
         formats.Items.Add("EPD");
         formats.SelectedIndex = settings.Value.ExportFormat switch { "csv" => 1, "epd" => 2, _ => 0 };
         var playerStart = new CheckBox { Content = "Start each game at the solver's position", IsChecked = settings.Value.ExportPlayerStart };
-        var explain = new TextBlock { Style = (Style)Application.Current.Resources["ExplanationStyle"] };
+        var explain = new TextBlock { Style = JupiterTheme.Style("JupiterCaptionTextStyle") };
         var path = new TextBox { Header = "File", IsReadOnly = false, PlaceholderText = "Choose where to save" };
         var browse = new Button { Content = "Browse…", VerticalAlignment = VerticalAlignment.Bottom };
         var pathRow = new Grid { ColumnSpacing = 8 };
@@ -82,8 +84,8 @@ public static class Dialogs
         pathRow.Children.Add(path);
         Grid.SetColumn(browse, 1);
         pathRow.Children.Add(browse);
-        var panel = new StackPanel { Spacing = 12, MinWidth = 420 };
-        panel.Children.Add(new TextBlock { Text = countText, TextWrapping = TextWrapping.Wrap });
+        var panel = new StackPanel { Spacing = 16, MinWidth = 420 };
+        panel.Children.Add(new TextBlock { Text = countText, Style = JupiterTheme.Style("JupiterBodyTextStyle") });
         panel.Children.Add(formats);
         panel.Children.Add(playerStart);
         panel.Children.Add(explain);
@@ -144,7 +146,7 @@ public static class Dialogs
     public static async Task ShowGoToPuzzleAsync(XamlRoot root, PuzzleViewModel puzzle)
     {
         var box = new TextBox { Header = "Puzzle id or lichess.org link", PlaceholderText = "00sHx" };
-        var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["JupiterErrorBrush"] };
+        var error = new TextBlock { Visibility = Visibility.Collapsed, Style = JupiterTheme.Style("JupiterCaptionTextStyle"), Foreground = JupiterTheme.Brush("JupiterErrorBrush") };
         var panel = new StackPanel { Spacing = 8, MinWidth = 320 };
         panel.Children.Add(box);
         panel.Children.Add(error);
@@ -178,13 +180,13 @@ public static class Dialogs
             var grid = new Grid { ColumnSpacing = 16 };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.Children.Add(new TextBlock { Text = label, Style = (Style)Application.Current.Resources["FieldLabelStyle"] });
-            var text = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+            grid.Children.Add(new TextBlock { Text = label, Style = JupiterTheme.Style("JupiterCaptionTextStyle"), VerticalAlignment = VerticalAlignment.Center });
+            var text = new TextBlock { Text = value, Style = JupiterTheme.Style("JupiterBodyTextStyle"), IsTextSelectionEnabled = true };
             Grid.SetColumn(text, 1);
             grid.Children.Add(text);
             panel.Children.Add(grid);
         }
-        void Heading(string text) => panel.Children.Add(new TextBlock { Text = text, Style = (Style)Application.Current.Resources["PaneHeadingStyle"], Margin = new Thickness(0, 8, 0, 0) });
+        void Heading(string text) => panel.Children.Add(new TextBlock { Text = text, Style = JupiterTheme.Style("JupiterPaneHeadingTextStyle"), Margin = new Thickness(0, 8, 0, 0) });
 
         Heading("Puzzle store");
         if (status?.Store is { } store)
@@ -271,7 +273,7 @@ public static class Dialogs
             ("Ctrl+G", "Go to puzzle"),
             ("Ctrl+1 / Ctrl+2", "Puzzle / History"),
             ("Ctrl+E", "Export matching puzzles"),
-            ("Ctrl+S", "Save the puzzle as PGN"),
+            ("Ctrl+Shift+E", "Export the puzzle as PGN"),
             ("Left / Right", "Back / forward one move"),
             ("Home / End", "First / latest position"),
             ("F", "Flip board"),
@@ -285,14 +287,14 @@ public static class Dialogs
             ("Board: Escape", "Clear the selection or close the promotion choice"),
             ("Promotion: Q, R, B, N", "Choose the piece"),
         ];
-        var grid = new Grid { ColumnSpacing = 24, RowSpacing = 6 };
+        var grid = new Grid { ColumnSpacing = 24, RowSpacing = 8 };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         for (var i = 0; i < rows.Length; i++)
         {
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var keys = new TextBlock { Text = rows[i].Keys, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-            var action = new TextBlock { Text = rows[i].Action, TextWrapping = TextWrapping.Wrap };
+            var keys = new TextBlock { Text = rows[i].Keys, Style = JupiterTheme.Style("JupiterBodyStrongTextStyle"), TextWrapping = TextWrapping.NoWrap };
+            var action = new TextBlock { Text = rows[i].Action, Style = JupiterTheme.Style("JupiterBodyTextStyle") };
             Grid.SetRow(keys, i);
             Grid.SetRow(action, i);
             Grid.SetColumn(action, 1);
@@ -305,6 +307,15 @@ public static class Dialogs
     public static async Task ShowAboutAsync(XamlRoot root)
     {
         var version = typeof(Dialogs).Assembly.GetName().Version?.ToString(3) ?? "0.1.0";
+        // Standard section 13: About shows the build identity, here the version with its source commit.
+        var build = typeof(Dialogs).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? version;
+        var plus = build.IndexOf('+');
+        if (plus >= 0 && build.Length > plus + 13)
+        {
+            build = build[..(plus + 13)];
+        }
         var text = new RichTextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 420 };
         void Paragraph(params Inline[] inlines)
         {
@@ -315,7 +326,8 @@ public static class Dialogs
             }
             text.Blocks.Add(p);
         }
-        Paragraph(new Run { Text = $"Lichess Puzzles {version}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }, new LineBreak(), new Run { Text = "Jupiter family · MIT licence" });
+        Paragraph(new Run { Text = $"Lichess Puzzles {version}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }, new LineBreak(),
+            new Run { Text = "Part of Jupiter · MIT licence" }, new LineBreak(), new Run { Text = $"Build {build}" });
         Paragraph(new Run { Text = "Puzzles: the Lichess puzzle database, released under CC0 (database.lichess.org)." });
         Paragraph(new Run { Text = "Chess rules: cozy-chess, MIT licence. Evaluation: a small built-in engine using Tomasz Michniewski's simplified evaluation function." });
         Paragraph(new Run { Text = "Pieces: Merida by Armando Hernandez Marroquin, GPL version 2 or later." });

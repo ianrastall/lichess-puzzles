@@ -169,6 +169,13 @@
         "resolved": "9.0.0",
         "contentHash": "hyJB4UlpAi19Xr9AXzu2NuagKC4lPfHObNMEAA0HmqFz2rX7wKgzeYzO/jM/eBHDhnUGFFEjk5cOoJaxqg5J4A=="
       },
+      "jupiter.ui": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Windows.SDK.BuildTools": "[10.0.28000.2705, )",
+          "Microsoft.WindowsAppSDK": "[2.5.1, )"
+        }
+      },
       "lichesspuzzles.interop": {
         "type": "Project",
         "dependencies": {

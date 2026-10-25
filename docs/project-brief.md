@@ -134,7 +134,7 @@ Built 24 October 2026:
   - Named filter presets, kept in `settings.json`.
 - **Export** (`export.rs`):
   - Matching puzzles or the player's played puzzles as PGN, CSV or EPD, run as a cancellable operation with a **Show file** result.
-  - **Save puzzle as PGN** and **Copy PGN** for the open puzzle.
+  - **Export puzzle as PGN** and **Copy PGN** for the open puzzle.
   - PGN keeps the predecessor's format: `Puzzle*` tags, `Source`, and the opponent's move first unless the solver's position is chosen.
 - **Evaluation engine** (`engine.rs`):
   - Iterative-deepening alpha-beta (principal variation search), quiescence search, a transposition table, killer and history move ordering, and Michniewski's piece-square tables.

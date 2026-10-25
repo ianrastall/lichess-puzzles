@@ -26,9 +26,10 @@
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem x:Name="ExportPlayedItem" Text="Export played puzzles…" Click="OnExportPlayed" />
-                <MenuFlyoutItem x:Name="SavePgnItem" Text="Save puzzle as PGN…" Click="OnSavePgn">
+                <!-- An export, not a save: Ctrl+S is reserved for Save (standard section 9). -->
+                <MenuFlyoutItem x:Name="ExportPuzzlePgnItem" Text="Export puzzle as PGN…" Click="OnExportPuzzlePgn">
                     <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Modifiers="Control" Key="S" />
+                        <KeyboardAccelerator Modifiers="Control,Shift" Key="E" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
@@ -116,13 +117,13 @@
             </MenuBarItem>
         </MenuBar>
 
-        <Grid x:Name="Workspace" Grid.Row="1" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,1">
+        <Grid x:Name="Workspace" Grid.Row="1" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="FilterColumn" Width="300" MinWidth="0" />
+                <ColumnDefinition x:Name="FilterColumn" Width="320" MinWidth="0" />
                 <ColumnDefinition x:Name="FilterSplitterColumn" Width="Auto" />
                 <ColumnDefinition Width="*" MinWidth="320" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition x:Name="PuzzleColumn" Width="340" MinWidth="300" />
+                <ColumnDefinition x:Name="PuzzleColumn" Width="320" MinWidth="300" />
             </Grid.ColumnDefinitions>
 
             <Border x:Name="FilterHost" />
@@ -141,37 +142,37 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <!-- Evaluation bar: Black's share above, White's below -->
-                    <Grid x:Name="EvaluationBar" Width="12" CornerRadius="3" BorderThickness="1" Visibility="Collapsed"
+                    <Grid x:Name="EvaluationBar" Width="12" CornerRadius="{StaticResource ControlCornerRadius}" BorderThickness="1" Visibility="Collapsed"
                           BorderBrush="{ThemeResource JupiterControlBoundaryBrush}" VerticalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition x:Name="BlackShareRow" Height="*" />
                             <RowDefinition x:Name="WhiteShareRow" Height="*" />
                         </Grid.RowDefinitions>
-                        <Rectangle Fill="#2B2824" />
-                        <Rectangle Grid.Row="1" Fill="#E8E4DC" />
+                        <Rectangle Fill="{ThemeResource JupiterRaisedBrush}" />
+                        <Rectangle Grid.Row="1" Fill="{ThemeResource JupiterPrimaryTextBrush}" />
                     </Grid>
                     <board:ChessBoard x:Name="Board" Grid.Column="1" />
                 </Grid>
                 <StackPanel x:Name="Navigation" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
                     <Button Command="{x:Bind Puzzle.FirstCommand}" IsEnabled="{x:Bind Puzzle.CanGoBack, Mode=OneWay}"
                             AutomationProperties.Name="First position" ToolTipService.ToolTip="First position (Home)">
-                        <FontIcon Glyph="&#xE892;" FontSize="16" />
+                        <FontIcon Glyph="&#xE892;" Style="{StaticResource JupiterCommandIconStyle}" />
                     </Button>
                     <Button Command="{x:Bind Puzzle.BackCommand}" IsEnabled="{x:Bind Puzzle.CanGoBack, Mode=OneWay}"
                             AutomationProperties.Name="Back" ToolTipService.ToolTip="Back (Left)">
-                        <FontIcon Glyph="&#xE76B;" FontSize="16" />
+                        <FontIcon Glyph="&#xE76B;" Style="{StaticResource JupiterCommandIconStyle}" />
                     </Button>
                     <Button Command="{x:Bind Puzzle.ForwardCommand}" IsEnabled="{x:Bind Puzzle.CanGoForward, Mode=OneWay}"
                             AutomationProperties.Name="Forward" ToolTipService.ToolTip="Forward (Right)">
-                        <FontIcon Glyph="&#xE76C;" FontSize="16" />
+                        <FontIcon Glyph="&#xE76C;" Style="{StaticResource JupiterCommandIconStyle}" />
                     </Button>
                     <Button Command="{x:Bind Puzzle.LatestCommand}" IsEnabled="{x:Bind Puzzle.CanGoForward, Mode=OneWay}"
                             AutomationProperties.Name="Latest position" ToolTipService.ToolTip="Latest position (End)">
-                        <FontIcon Glyph="&#xE893;" FontSize="16" />
+                        <FontIcon Glyph="&#xE893;" Style="{StaticResource JupiterCommandIconStyle}" />
                     </Button>
                     <Button Click="OnFlip" Margin="16,0,0,0" IsEnabled="{x:Bind Puzzle.HasPuzzle, Mode=OneWay}"
                             AutomationProperties.Name="Flip board" ToolTipService.ToolTip="Flip board (F)">
-                        <FontIcon Glyph="&#xE8AB;" FontSize="16" />
+                        <FontIcon Glyph="&#xE8AB;" Style="{StaticResource JupiterCommandIconStyle}" />
                     </Button>
                 </StackPanel>
 
@@ -179,12 +180,12 @@
                 <Border Grid.RowSpan="2" Background="{ThemeResource JupiterWindowBrush}"
                         Visibility="{x:Bind ShowIf(Status.ShowEmptyState), Mode=OneWay}">
                     <StackPanel MaxWidth="440" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
-                        <TextBlock Text="{x:Bind Status.EmptyTitle, Mode=OneWay}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <TextBlock Text="{x:Bind Status.EmptyMessage, Mode=OneWay}" Style="{StaticResource CaptionStyle}" FontSize="14" />
+                        <TextBlock Text="{x:Bind Status.EmptyTitle, Mode=OneWay}" Style="{StaticResource JupiterPageHeadingTextStyle}" />
+                        <TextBlock Text="{x:Bind Status.EmptyMessage, Mode=OneWay}" Style="{StaticResource JupiterBodyTextStyle}" />
                         <StackPanel Spacing="8" Visibility="{x:Bind ShowIf(Status.IsRunning), Mode=OneWay}">
                             <ProgressBar Value="{x:Bind Status.OperationPercent, Mode=OneWay}" IsIndeterminate="{x:Bind Status.IsIndeterminate, Mode=OneWay}"
                                          AutomationProperties.Name="Progress" />
-                            <TextBlock Text="{x:Bind Status.OperationText, Mode=OneWay}" Style="{StaticResource CaptionStyle}" />
+                            <TextBlock Text="{x:Bind Status.OperationText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button Content="Pause" Click="OnPause" Visibility="{x:Bind ShowIf(Status.CanPause), Mode=OneWay}"
                                         ToolTipService.ToolTip="Stop the download; it resumes from here later" />
@@ -205,38 +206,39 @@
             <Border x:Name="PuzzleHost" Grid.Column="4" />
 
             <!-- The filter pane as an overlay in narrow windows -->
-            <Border x:Name="FilterOverlay" Grid.ColumnSpan="3" HorizontalAlignment="Left" Width="300" Visibility="Collapsed"
+            <Border x:Name="FilterOverlay" Grid.ColumnSpan="3" HorizontalAlignment="Left" Width="320" Visibility="Collapsed"
                     BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,0,1,0" />
         </Grid>
 
-        <!-- Status bar -->
-        <Grid x:Name="StatusBar" Grid.Row="2" MinHeight="32" Padding="12,0" ColumnSpacing="16" Background="{ThemeResource JupiterWindowBrush}">
+        <!-- Status bar (standard section 6): surface, separator above, caption text -->
+        <Grid x:Name="StatusBar" Grid.Row="2" MinHeight="{StaticResource JupiterStatusBarHeight}" Padding="{StaticResource JupiterStatusBarPadding}" ColumnSpacing="16"
+              Background="{ThemeResource JupiterSurfaceBrush}" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <HyperlinkButton x:Name="DatabaseButton" Content="{x:Bind Status.DatabaseText, Mode=OneWay}" Click="OnDatabaseDetails" Padding="4,2"
-                             FontSize="12" Foreground="{ThemeResource JupiterSecondaryTextBrush}" ToolTipService.ToolTip="Database details" />
+            <HyperlinkButton x:Name="DatabaseButton" Content="{x:Bind Status.DatabaseText, Mode=OneWay}" Click="OnDatabaseDetails" Padding="4,0"
+                             FontSize="{StaticResource JupiterCaptionFontSize}" Foreground="{ThemeResource JupiterSecondaryTextBrush}" ToolTipService.ToolTip="Database details" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
                         Visibility="{x:Bind ShowIf(Status.HasNotice), Mode=OneWay}">
-                <FontIcon Glyph="{x:Bind SeverityGlyph(Status.NoticeSeverity), Mode=OneWay}" FontSize="14"
+                <FontIcon Glyph="{x:Bind SeverityGlyph(Status.NoticeSeverity), Mode=OneWay}" Style="{StaticResource JupiterCommandIconStyle}"
                           Foreground="{x:Bind SeverityBrush(Status.NoticeSeverity), Mode=OneWay}" VerticalAlignment="Center" />
-                <TextBlock Text="{x:Bind Status.NoticeText, Mode=OneWay}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                           AutomationProperties.LiveSetting="Polite" />
-                <HyperlinkButton Content="{x:Bind Status.NoticeActionText, Mode=OneWay}" Click="OnNoticeAction" Padding="4,2" FontSize="12"
+                <TextBlock Text="{x:Bind Status.NoticeText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" VerticalAlignment="Center"
+                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite" />
+                <HyperlinkButton Content="{x:Bind Status.NoticeActionText, Mode=OneWay}" Click="OnNoticeAction" Padding="4,0" FontSize="{StaticResource JupiterCaptionFontSize}"
                                  Visibility="{x:Bind ShowIf(Status.HasNoticeAction), Mode=OneWay}" />
-                <Button Click="OnDismissNotice" Padding="6,4" Background="Transparent" BorderThickness="0"
+                <Button Click="OnDismissNotice" Style="{StaticResource JupiterSubtleButtonStyle}" Padding="4"
                         AutomationProperties.Name="Dismiss" ToolTipService.ToolTip="Dismiss">
-                    <FontIcon Glyph="&#xE711;" FontSize="10" />
+                    <FontIcon Glyph="&#xE711;" Style="{StaticResource JupiterSmallIconStyle}" />
                 </Button>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ShowIf(Status.IsRunning), Mode=OneWay}">
-                <TextBlock Text="{x:Bind Status.OperationText, Mode=OneWay}" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Text="{x:Bind Status.OperationText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" TextWrapping="NoWrap" VerticalAlignment="Center" />
                 <ProgressBar Width="140" VerticalAlignment="Center" Value="{x:Bind Status.OperationPercent, Mode=OneWay}"
                              IsIndeterminate="{x:Bind Status.IsIndeterminate, Mode=OneWay}" AutomationProperties.Name="Operation progress" />
-                <HyperlinkButton Content="Pause" Click="OnPause" Padding="4,2" FontSize="12" Visibility="{x:Bind ShowIf(Status.CanPause), Mode=OneWay}" />
-                <HyperlinkButton Content="Cancel" Click="OnCancelOperation" Padding="4,2" FontSize="12" IsEnabled="{x:Bind Status.CanCancel, Mode=OneWay}" />
+                <HyperlinkButton Content="Pause" Click="OnPause" Padding="4,0" FontSize="{StaticResource JupiterCaptionFontSize}" Visibility="{x:Bind ShowIf(Status.CanPause), Mode=OneWay}" />
+                <HyperlinkButton Content="Cancel" Click="OnCancelOperation" Padding="4,0" FontSize="{StaticResource JupiterCaptionFontSize}" IsEnabled="{x:Bind Status.CanCancel, Mode=OneWay}" />
             </StackPanel>
         </Grid>
     </Grid>

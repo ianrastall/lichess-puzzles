@@ -7,6 +7,9 @@ Status: stages 1 to 5 of the [project brief](docs/project-brief.md) are built. T
 - [Project brief](docs/project-brief.md): decisions, source data, workflows, measurements and open questions
 - [Workbench layout](docs/workbench-layout.md): regions, menus, states and keyboard behaviour for the desktop shell
 - [Source map](docs/source-map.json): related folders and their dispositions
+- [Jupiter style exceptions](docs/jupiter-exceptions.md): recorded departures from the style standard
+
+Follows Jupiter style standard 1.0 through the shared [Jupiter.UI](../jupiter-ui/readme.md) library, which must sit beside this repository (`D:\jupiter\jupiter-ui`) to build.
 
 This is a fresh repository. The previous [Lichess Puzzle Desktop](<D:/dev/proj/lichess-puzzle-desktop>) remains in place as a reference.
 

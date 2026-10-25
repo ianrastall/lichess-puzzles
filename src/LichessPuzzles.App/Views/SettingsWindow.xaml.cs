@@ -1,7 +1,6 @@
 using Jupiter.LichessPuzzles.App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 
 namespace Jupiter.LichessPuzzles.App.Views;
@@ -32,16 +31,20 @@ public sealed partial class SettingsWindow : Window
         _main = main;
         InitializeComponent();
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"));
-        AppWindow.Title = "Settings · Lichess Puzzles";
+        AppWindow.Title = "Settings - Lichess Puzzles";
+        // Standard 6.1: settings windows are 720 × 720, minimum 560 × 480.
         var scale = Win32Dpi.Scale(Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(main.AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary));
         var parent = main.AppWindow.Position;
-        AppWindow.MoveAndResize(new RectInt32(parent.X + 80, parent.Y + 60, (int)(620 * scale), (int)(760 * scale)));
+        AppWindow.MoveAndResize(new RectInt32(parent.X + 80, parent.Y + 60, (int)(720 * scale), (int)(720 * scale)));
+        if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = (int)(560 * scale);
+            presenter.PreferredMinimumHeight = (int)(480 * scale);
+        }
+        _app.Accent.Attach(Root);
+        AccentSetting.Service = _app.Accent;
 
         var settings = _app.Settings.Value;
-        AccentChoice.SelectedIndex = _app.Accent.UseCustomAccent ? 1 : 0;
-        UpdateSwatch();
-        _app.Accent.Changed += UpdateSwatch;
-        Closed += (_, _) => _app.Accent.Changed -= UpdateSwatch;
 
         foreach (var theme in BoardThemes.All)
         {
@@ -71,43 +74,6 @@ public sealed partial class SettingsWindow : Window
         }
         _app.Settings.Save();
         _main.ApplyBoardSettings();
-    }
-
-    private void UpdateSwatch()
-    {
-        AccentSwatch.Background = new SolidColorBrush(_app.Accent.Current);
-        AccentPicker.Color = _app.Accent.CustomColor;
-        AccentSwatchButton.IsEnabled = AccentChoice.SelectedIndex == 1;
-    }
-
-    private void OnAccentChoiceChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loading)
-        {
-            return;
-        }
-        if (AccentChoice.SelectedIndex == 0)
-        {
-            _app.Accent.UseWindows();
-        }
-        else
-        {
-            _app.Accent.UseCustom(_app.Accent.CustomColor);
-        }
-        UpdateSwatch();
-    }
-
-    private void OnApplyCustomAccent(object sender, RoutedEventArgs e)
-    {
-        _app.Accent.UseCustom(AccentPicker.Color);
-        AccentChoice.SelectedIndex = 1;
-        AccentSwatchButton.Flyout?.Hide();
-    }
-
-    private void OnResetAccent(object sender, RoutedEventArgs e)
-    {
-        _app.Accent.UseWindows();
-        AccentChoice.SelectedIndex = 0;
     }
 
     private void OnBoardThemeChanged(object sender, SelectionChangedEventArgs e)

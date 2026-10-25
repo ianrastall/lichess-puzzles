@@ -3,78 +3,15 @@
     x:Class="Jupiter.LichessPuzzles.App.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:jupiter="using:Jupiter.UI"
     RequestedTheme="Dark">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- Every color, text style and control style comes from Jupiter.UI (style standard 1.0). -->
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <jupiter:JupiterResources />
             </ResourceDictionary.MergedDictionaries>
-
-            <!-- Jupiter warm-dark palette (style draft 0.1). Contrast themes use system colors. -->
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Default">
-                    <SolidColorBrush x:Key="JupiterWindowBrush" Color="#1C1B19" />
-                    <SolidColorBrush x:Key="JupiterSurfaceBrush" Color="#24221F" />
-                    <SolidColorBrush x:Key="JupiterRaisedBrush" Color="#2B2824" />
-                    <SolidColorBrush x:Key="JupiterInputBrush" Color="#181715" />
-                    <SolidColorBrush x:Key="JupiterSeparatorBrush" Color="#3B3732" />
-                    <SolidColorBrush x:Key="JupiterControlBoundaryBrush" Color="#797267" />
-                    <SolidColorBrush x:Key="JupiterPrimaryTextBrush" Color="#E8E4DC" />
-                    <SolidColorBrush x:Key="JupiterSecondaryTextBrush" Color="#B8B2A8" />
-                    <SolidColorBrush x:Key="JupiterQuietTextBrush" Color="#989187" />
-                    <SolidColorBrush x:Key="JupiterSuccessBrush" Color="#9BC6A6" />
-                    <SolidColorBrush x:Key="JupiterWarningBrush" Color="#E3BD77" />
-                    <SolidColorBrush x:Key="JupiterErrorBrush" Color="#E99A91" />
-                    <SolidColorBrush x:Key="JupiterInfoBrush" Color="#A7BDCF" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="HighContrast">
-                    <SolidColorBrush x:Key="JupiterWindowBrush" Color="{ThemeResource SystemColorWindowColor}" />
-                    <SolidColorBrush x:Key="JupiterSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
-                    <SolidColorBrush x:Key="JupiterRaisedBrush" Color="{ThemeResource SystemColorWindowColor}" />
-                    <SolidColorBrush x:Key="JupiterInputBrush" Color="{ThemeResource SystemColorWindowColor}" />
-                    <SolidColorBrush x:Key="JupiterSeparatorBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterControlBoundaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterPrimaryTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterSecondaryTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterQuietTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterSuccessBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterWarningBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterErrorBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                    <SolidColorBrush x:Key="JupiterInfoBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-
-            <Style x:Key="SectionHeadingStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="18" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{ThemeResource JupiterPrimaryTextBrush}" />
-                <Setter Property="Margin" Value="0,24,0,8" />
-            </Style>
-            <Style x:Key="PaneHeadingStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="14" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{ThemeResource JupiterPrimaryTextBrush}" />
-            </Style>
-            <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{ThemeResource JupiterSecondaryTextBrush}" />
-                <Setter Property="Margin" Value="0,0,0,4" />
-            </Style>
-            <Style x:Key="CaptionStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{ThemeResource JupiterSecondaryTextBrush}" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
-            <Style x:Key="QuietCaptionStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{ThemeResource JupiterQuietTextBrush}" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
-            <Style x:Key="ExplanationStyle" TargetType="TextBlock">
-                <Setter Property="Foreground" Value="{ThemeResource JupiterSecondaryTextBrush}" />
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

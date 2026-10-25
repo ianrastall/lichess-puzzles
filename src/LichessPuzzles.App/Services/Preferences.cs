@@ -12,7 +12,8 @@ public sealed class AppSettings
 
     // Appearance
     public bool UseCustomAccent { get; set; }
-    public string CustomAccent { get; set; } = "#C8A15A";
+    /// <summary>#RRGGBB, or null until a custom color is chosen.</summary>
+    public string? CustomAccent { get; set; }
     public string BoardTheme { get; set; } = BoardThemes.Brown;
     public bool ShowCoordinates { get; set; } = true;
     public string MoveAnimation { get; set; } = "Normal";
@@ -84,8 +85,8 @@ public sealed class UiState
     public int WindowWidth { get; set; }
     public int WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
-    public double FilterPaneWidth { get; set; } = 300;
-    public double PuzzlePaneWidth { get; set; } = 340;
+    public double FilterPaneWidth { get; set; } = 320;
+    public double PuzzlePaneWidth { get; set; } = 320;
     public bool FilterPaneVisible { get; set; } = true;
     public List<string> CollapsedThemeGroups { get; set; } = [];
     public bool QualityExpanded { get; set; }

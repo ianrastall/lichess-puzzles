@@ -42,4 +42,6 @@
   </ItemGroup>
 
   <Import Project="$(RepoRoot)build\native.targets" />
+  <!-- Jupiter style standard 1.0: shared resources, accent service and the style check. -->
+  <Import Project="$(RepoRoot)..\jupiter-ui\build\Jupiter.UI.targets" />
 </Project>

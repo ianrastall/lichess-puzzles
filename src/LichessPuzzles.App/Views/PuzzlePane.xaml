@@ -7,20 +7,16 @@
     xmlns:views="using:Jupiter.LichessPuzzles.App.Views">
 
     <UserControl.Resources>
-        <Style x:Key="MoveButtonStyle" TargetType="Button">
+        <Style x:Key="MoveButtonStyle" TargetType="Button" BasedOn="{StaticResource JupiterSubtleButtonStyle}">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="8,4" />
         </Style>
-        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+        <!-- Sortable column headers: caption-size secondary text (standard section 4). -->
+        <Style x:Key="HeaderButtonStyle" TargetType="Button" BasedOn="{StaticResource JupiterSubtleButtonStyle}">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="4,2" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="4,0,4,0" />
+            <Setter Property="FontSize" Value="{StaticResource JupiterCaptionFontSize}" />
             <Setter Property="Foreground" Value="{ThemeResource JupiterSecondaryTextBrush}" />
         </Style>
         <DataTemplate x:Key="MoveRowTemplate" x:DataType="vm:MoveRow">
@@ -52,7 +48,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Rectangle Height="1" Fill="{ThemeResource JupiterSeparatorBrush}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="Puzzle starts" FontSize="12" Foreground="{ThemeResource JupiterQuietTextBrush}" />
+                <TextBlock Grid.Column="1" Text="Puzzle starts" Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                 <Rectangle Grid.Column="2" Height="1" Fill="{ThemeResource JupiterSeparatorBrush}" VerticalAlignment="Center" />
             </Grid>
         </DataTemplate>
@@ -87,18 +83,18 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" IsTextSelectionEnabled="True"
-                               TextTrimming="CharacterEllipsis" />
-                    <HyperlinkButton Grid.Column="1" Content="Open on lichess.org" Click="OnOpenLichess" Padding="4,2"
+                    <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" Style="{StaticResource JupiterSectionHeadingTextStyle}" IsTextSelectionEnabled="True"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                    <HyperlinkButton Grid.Column="1" Content="Open on lichess.org" Click="OnOpenLichess" Padding="4,0"
                                      Visibility="{x:Bind views:PuzzlePane.Visible(ViewModel.HasPuzzle), Mode=OneWay}"
                                      ToolTipService.ToolTip="Open this puzzle on lichess.org in your browser" />
                 </Grid>
-                <TextBlock Text="{x:Bind ViewModel.Facts, Mode=OneWay}" Style="{StaticResource CaptionStyle}" IsTextSelectionEnabled="True" />
-                <TextBlock Text="{x:Bind ViewModel.Opening, Mode=OneWay}" Style="{StaticResource CaptionStyle}"
+                <TextBlock Text="{x:Bind ViewModel.Facts, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" IsTextSelectionEnabled="True" />
+                <TextBlock Text="{x:Bind ViewModel.Opening, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}"
                            Visibility="{x:Bind views:PuzzlePane.HasText(ViewModel.Opening), Mode=OneWay}" />
-                <TextBlock Text="{x:Bind ViewModel.Themes, Mode=OneWay}" Style="{StaticResource CaptionStyle}"
+                <TextBlock Text="{x:Bind ViewModel.Themes, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}"
                            Visibility="{x:Bind views:PuzzlePane.HasText(ViewModel.Themes), Mode=OneWay}" />
-                <TextBlock Text="{x:Bind ViewModel.ThemesNote, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}"
+                <TextBlock Text="{x:Bind ViewModel.ThemesNote, Mode=OneWay}" Style="{StaticResource JupiterQuietCaptionTextStyle}"
                            Visibility="{x:Bind views:PuzzlePane.HasText(ViewModel.ThemesNote), Mode=OneWay}" />
             </StackPanel>
 
@@ -109,7 +105,7 @@
                      AutomationProperties.LiveSetting="Assertive" />
 
             <Border Grid.Row="2" Background="{ThemeResource JupiterInputBrush}" BorderBrush="{ThemeResource JupiterSeparatorBrush}"
-                    BorderThickness="1" CornerRadius="6" Padding="4" MinHeight="80">
+                    BorderThickness="1" CornerRadius="{StaticResource ControlCornerRadius}" Padding="4" MinHeight="80">
                 <ListView x:Name="MoveList" ItemsSource="{x:Bind ViewModel.Moves}" ItemTemplateSelector="{StaticResource MoveRowSelector}"
                           SelectionMode="None" AutomationProperties.Name="Moves">
                     <ListView.ItemContainerStyle>
@@ -143,7 +139,7 @@
             </Grid>
 
             <!-- Player -->
-            <StackPanel Grid.Row="4" Spacing="6" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+            <StackPanel Grid.Row="4" Spacing="8" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                 <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -156,7 +152,7 @@
                             <MenuFlyout x:Name="PlayerMenu" Opening="OnPlayerMenuOpening" Placement="TopEdgeAlignedLeft" />
                         </DropDownButton.Flyout>
                     </DropDownButton>
-                    <TextBlock Grid.Column="1" Text="{x:Bind Player.RatingText, Mode=OneWay}" FontWeight="SemiBold" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="1" Text="{x:Bind Player.RatingText, Mode=OneWay}" Style="{StaticResource JupiterBodyStrongTextStyle}" VerticalAlignment="Center"
                                ToolTipService.ToolTip="{x:Bind Player.RatingTooltip, Mode=OneWay}"
                                AutomationProperties.Name="{x:Bind Player.RatingTooltip, Mode=OneWay}" />
                     <TextBlock Grid.Column="2" Text="{x:Bind Player.ChangeText, Mode=OneWay}" VerticalAlignment="Center" MinWidth="32" TextAlignment="Right"
@@ -169,7 +165,7 @@
                     </Grid.ColumnDefinitions>
                     <ToggleSwitch IsOn="{x:Bind Player.Rated, Mode=TwoWay}" OnContent="Rated" OffContent="Rated" MinWidth="0"
                                   ToolTipService.ToolTip="A first attempt at a puzzle counts toward the rating; the first mistake, hint or solution makes it a loss" />
-                    <TextBlock Grid.Column="1" Text="{x:Bind Player.TodayText, Mode=OneWay}" Style="{StaticResource CaptionStyle}"
+                    <TextBlock Grid.Column="1" Text="{x:Bind Player.TodayText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}"
                                VerticalAlignment="Center" HorizontalAlignment="Right" />
                 </Grid>
             </StackPanel>
@@ -178,13 +174,13 @@
             <StackPanel Grid.Row="5" Spacing="4" Visibility="{x:Bind views:PuzzlePane.Visible(Evaluation.IsVisible), Mode=OneWay}"
                         BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                 <Grid>
-                    <TextBlock Text="Evaluation" Style="{StaticResource PaneHeadingStyle}" />
-                    <TextBlock Text="{x:Bind Evaluation.ScoreText, Mode=OneWay}" FontWeight="SemiBold" HorizontalAlignment="Right"
+                    <TextBlock Text="Evaluation" Style="{StaticResource JupiterPaneHeadingTextStyle}" />
+                    <TextBlock Text="{x:Bind Evaluation.ScoreText, Mode=OneWay}" Style="{StaticResource JupiterBodyStrongTextStyle}" HorizontalAlignment="Right"
                                AutomationProperties.LiveSetting="Polite" />
                 </Grid>
                 <TextBlock Text="{x:Bind Evaluation.LineText, Mode=OneWay}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"
                            IsTextSelectionEnabled="True" />
-                <TextBlock Text="{x:Bind Evaluation.DetailText, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}" />
+                <TextBlock Text="{x:Bind Evaluation.DetailText, Mode=OneWay}" Style="{StaticResource JupiterQuietCaptionTextStyle}" />
             </StackPanel>
         </Grid>
 
@@ -202,7 +198,7 @@
                 <x:String>Solved with help</x:String>
                 <x:String>Failed</x:String>
             </ComboBox>
-            <TextBlock Grid.Row="1" Text="{x:Bind History.TotalsText, Mode=OneWay}" Style="{StaticResource CaptionStyle}" />
+            <TextBlock Grid.Row="1" Text="{x:Bind History.TotalsText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" />
             <Grid Grid.Row="2" ColumnSpacing="4" Padding="12,0,12,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.6*" />
@@ -238,7 +234,7 @@
                                     <MenuFlyoutItem Text="Copy puzzle id" Tag="{x:Bind PuzzleId}" Click="OnHistoryCopy" />
                                 </MenuFlyout>
                             </Grid.ContextFlyout>
-                            <TextBlock Text="{x:Bind Played}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind Played}" Style="{StaticResource JupiterCaptionTextStyle}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
                             <TextBlock Grid.Column="1" Text="{x:Bind PuzzleId}" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" Text="{x:Bind Rating}" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="3" Text="{x:Bind Result}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -247,7 +243,7 @@
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
-            <TextBlock Grid.Row="3" Text="{x:Bind History.EmptyText, Mode=OneWay}" Style="{StaticResource CaptionStyle}" Margin="12,8"
+            <TextBlock Grid.Row="3" Text="{x:Bind History.EmptyText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" Margin="12,8"
                        Visibility="{x:Bind views:PuzzlePane.Visible(History.IsEmpty), Mode=OneWay}" />
         </Grid>
     </Grid>

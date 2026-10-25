@@ -9,9 +9,9 @@
 
     <UserControl.Resources>
         <DataTemplate x:Key="GroupTemplate" x:DataType="vm:ThemeGroupRow">
-            <StackPanel Orientation="Horizontal" Spacing="8" Padding="0,6,0,2">
-                <FontIcon Glyph="{x:Bind Chevron, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource JupiterSecondaryTextBrush}" />
-                <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource JupiterSecondaryTextBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Padding="0,8,0,0">
+                <FontIcon Glyph="{x:Bind Chevron, Mode=OneWay}" Style="{StaticResource JupiterSmallIconStyle}" Foreground="{ThemeResource JupiterSecondaryTextBrush}" />
+                <TextBlock Text="{x:Bind Name}" Style="{StaticResource JupiterCaptionStrongTextStyle}" />
             </StackPanel>
         </DataTemplate>
         <DataTemplate x:Key="ThemeTemplate" x:DataType="vm:ThemeRow">
@@ -21,14 +21,14 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" Style="{StaticResource JupiterCommandIconStyle}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                    <TextBlock Text="{x:Bind StateLabel, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
+                    <TextBlock Text="{x:Bind StateLabel, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" VerticalAlignment="Center"
                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </StackPanel>
-                <TextBlock Grid.Column="2" Text="{x:Bind CountText, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
-                           Foreground="{ThemeResource JupiterQuietTextBrush}" />
+                <!-- Secondary, not quiet: the row can be hovered (standard 3.2). -->
+                <TextBlock Grid.Column="2" Text="{x:Bind CountText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" VerticalAlignment="Center" />
             </Grid>
         </DataTemplate>
         <views:ThemeRowTemplateSelector x:Key="ThemeRowSelector" Group="{StaticResource GroupTemplate}" Theme="{StaticResource ThemeTemplate}" />
@@ -47,19 +47,19 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock x:Name="MatchCount" Text="{x:Bind ViewModel.MatchText, Mode=OneWay}" Style="{StaticResource PaneHeadingStyle}"
-                       TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+            <TextBlock x:Name="MatchCount" Text="{x:Bind ViewModel.MatchText, Mode=OneWay}" Style="{StaticResource JupiterPaneHeadingTextStyle}"
+                       VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
             <HyperlinkButton Grid.Column="1" Content="Reset filters" Command="{x:Bind ViewModel.ResetCommand}"
                              IsEnabled="{x:Bind ViewModel.IsAvailable, Mode=OneWay}" Padding="4" />
-            <Button x:Name="CloseOverlayButton" Grid.Column="2" Visibility="Collapsed" Click="OnCloseOverlay"
-                    AutomationProperties.Name="Close filters" ToolTipService.ToolTip="Close filters (Ctrl+Shift+F)" Padding="6">
-                <FontIcon Glyph="&#xE711;" FontSize="12" />
+            <Button x:Name="CloseOverlayButton" Grid.Column="2" Visibility="Collapsed" Click="OnCloseOverlay" Style="{StaticResource JupiterSubtleButtonStyle}"
+                    AutomationProperties.Name="Close filters" ToolTipService.ToolTip="Close filters (Ctrl+Shift+F)">
+                <FontIcon Glyph="&#xE711;" Style="{StaticResource JupiterSmallIconStyle}" />
             </Button>
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" IsEnabled="{x:Bind ViewModel.IsAvailable, Mode=OneWay}">
             <StackPanel Padding="16,0,16,24" Spacing="16">
-                <TextBlock Text="Filters are available once puzzles are installed." Style="{StaticResource ExplanationStyle}"
+                <TextBlock Text="Filters are available once puzzles are installed." Style="{StaticResource JupiterCaptionTextStyle}"
                            Visibility="{x:Bind NotAvailable(ViewModel.IsAvailable), Mode=OneWay}" />
 
                 <!-- Presets -->
@@ -86,8 +86,8 @@
                                    PlaceholderText="Any"
                                    Minimum="0" Maximum="4000" AutomationProperties.Name="Rating to" />
                     </Grid>
-                    <TextBlock Text="{x:Bind ViewModel.RatingRange, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}" />
-                    <TextBlock Text="{x:Bind ViewModel.RatingNote, Mode=OneWay}" Style="{StaticResource ExplanationStyle}"
+                    <TextBlock Text="{x:Bind ViewModel.RatingRange, Mode=OneWay}" Style="{StaticResource JupiterQuietCaptionTextStyle}" />
+                    <TextBlock Text="{x:Bind ViewModel.RatingNote, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}"
                                Foreground="{ThemeResource JupiterWarningBrush}" Visibility="{x:Bind HasText(ViewModel.RatingNote), Mode=OneWay}" />
                 </StackPanel>
 
@@ -100,14 +100,14 @@
                     <StackPanel Spacing="4" Visibility="{x:Bind Shown(ViewModel.IsNearRating), Mode=OneWay}">
                         <controls:NumericTextBox Header="Difficulty offset, −600 to 600" Value="{x:Bind ViewModel.DifficultyOffset, Mode=TwoWay}"
                                    Minimum="-600" Maximum="600" />
-                        <TextBlock Text="{x:Bind ViewModel.TargetText, Mode=OneWay}" Style="{StaticResource QuietCaptionStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.TargetText, Mode=OneWay}" Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                     </StackPanel>
                     <CheckBox Content="Skip puzzles this player has played" IsChecked="{x:Bind ViewModel.SkipPlayed, Mode=TwoWay}" />
                 </StackPanel>
 
                 <!-- Themes -->
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Themes" Style="{StaticResource PaneHeadingStyle}" />
+                    <TextBlock Text="Themes" Style="{StaticResource JupiterPaneHeadingTextStyle}" />
                     <TextBox PlaceholderText="Find theme" Text="{x:Bind ViewModel.ThemeSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="Find theme" />
                     <RadioButtons Header="Included themes must" SelectedIndex="{x:Bind ViewModel.MatchModeIndex, Mode=TwoWay}" MaxColumns="2">
@@ -115,17 +115,16 @@
                         <x:String>All</x:String>
                     </RadioButtons>
                     <ListView x:Name="ThemeList" ItemsSource="{x:Bind ViewModel.ThemeRows}" ItemTemplateSelector="{StaticResource ThemeRowSelector}"
-                              SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnThemeClick" Margin="-12,0,-12,0"
+                              SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnThemeClick"
                               AutomationProperties.Name="Themes: select to cycle include, exclude, not used"
                               ScrollViewer.VerticalScrollMode="Disabled">
                         <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
-                                <Setter Property="MinHeight" Value="30" />
-                                <Setter Property="Padding" Value="12,0,12,0" />
+                            <Style TargetType="ListViewItem" BasedOn="{StaticResource JupiterCompactListViewItemStyle}">
+                                <Setter Property="Padding" Value="8,0,8,0" />
                             </Style>
                         </ListView.ItemContainerStyle>
                     </ListView>
-                    <TextBlock Text="Select a theme to include it; select again to exclude it." Style="{StaticResource QuietCaptionStyle}" />
+                    <TextBlock Text="Select a theme to include it; select again to exclude it." Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                 </StackPanel>
 
                 <!-- Opening -->
@@ -137,30 +136,35 @@
                             <DataTemplate x:DataType="vm:OpeningSuggestion">
                                 <StackPanel Padding="0,4">
                                     <TextBlock Text="{x:Bind Name}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{x:Bind Detail}" FontSize="12" Foreground="{ThemeResource JupiterQuietTextBrush}" />
+                                    <TextBlock Text="{x:Bind Detail}" Style="{StaticResource JupiterCaptionTextStyle}" />
                                 </StackPanel>
                             </DataTemplate>
                         </AutoSuggestBox.ItemTemplate>
                     </AutoSuggestBox>
                     <ItemsControl ItemsSource="{x:Bind ViewModel.Openings}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="4" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:OpeningToken">
-                                <Grid ColumnSpacing="4" Margin="0,2" Padding="8,2,2,2" CornerRadius="4" Background="{ThemeResource JupiterRaisedBrush}">
+                                <Grid ColumnSpacing="4" Padding="8,0,0,0" CornerRadius="{StaticResource ControlCornerRadius}" Background="{ThemeResource JupiterRaisedBrush}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Padding="6" Background="Transparent" BorderThickness="0"
+                                    <Button Grid.Column="1" Style="{StaticResource JupiterSubtleButtonStyle}"
                                             Click="OnRemoveOpening" Tag="{x:Bind}"
                                             AutomationProperties.Name="{x:Bind RemoveName}" ToolTipService.ToolTip="{x:Bind RemoveName}">
-                                        <FontIcon Glyph="&#xE711;" FontSize="10" />
+                                        <FontIcon Glyph="&#xE711;" Style="{StaticResource JupiterSmallIconStyle}" />
                                     </Button>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="Puzzles without an opening tag are excluded while an opening is chosen." Style="{StaticResource QuietCaptionStyle}" />
+                    <TextBlock Text="Puzzles without an opening tag are excluded while an opening is chosen." Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                 </StackPanel>
 
                 <!-- Side and length -->
@@ -171,7 +175,7 @@
                 </ComboBox>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Solution length, in the solver's moves" Style="{StaticResource PaneHeadingStyle}" FontWeight="Normal" />
+                    <TextBlock Text="Solution length, in the solver's moves" Style="{StaticResource JupiterFieldLabelTextStyle}" />
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

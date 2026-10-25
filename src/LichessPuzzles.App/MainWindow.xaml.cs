@@ -50,7 +50,7 @@ public sealed partial class MainWindow : Window, IBoardView
         app.Evaluation.PropertyChanged += (_, _) => UpdateEvaluationBar();
 
         var ui = app.Ui.Value;
-        FilterColumn.Width = new GridLength(Math.Clamp(ui.FilterPaneWidth, 260, 480));
+        FilterColumn.Width = new GridLength(Math.Clamp(ui.FilterPaneWidth, 240, 480));
         PuzzleColumn.Width = new GridLength(Math.Clamp(ui.PuzzlePaneWidth, 300, 520));
         FilterOverlay.Width = FilterColumn.Width.Value;
         FiltersItem.IsChecked = ui.FilterPaneVisible;
@@ -87,13 +87,13 @@ public sealed partial class MainWindow : Window, IBoardView
         _ => ((char)0xE946).ToString(),
     };
 
-    public Brush SeverityBrush(InfoBarSeverity severity) => (Brush)Application.Current.Resources[severity switch
+    public Brush SeverityBrush(InfoBarSeverity severity) => Jupiter.UI.JupiterTheme.Brush(severity switch
     {
         InfoBarSeverity.Success => "JupiterSuccessBrush",
         InfoBarSeverity.Warning => "JupiterWarningBrush",
         InfoBarSeverity.Error => "JupiterErrorBrush",
         _ => "JupiterInfoBrush",
-    }];
+    });
 
     // IBoardView ----------------------------------------------------------------------------------
 
@@ -151,7 +151,7 @@ public sealed partial class MainWindow : Window, IBoardView
         GoToItem.IsEnabled = hasStore;
         FirstItem.IsEnabled = BackItem.IsEnabled = Puzzle.CanGoBack;
         ForwardItem.IsEnabled = LatestItem.IsEnabled = Puzzle.CanGoForward;
-        CopyFenItem.IsEnabled = CopyLinkItem.IsEnabled = CopyPgnItem.IsEnabled = SavePgnItem.IsEnabled = OpenLichessItem.IsEnabled = view is not null;
+        CopyFenItem.IsEnabled = CopyLinkItem.IsEnabled = CopyPgnItem.IsEnabled = ExportPuzzlePgnItem.IsEnabled = OpenLichessItem.IsEnabled = view is not null;
         ExportMatchingItem.IsEnabled = hasStore && !running && _app.Filter.HasMatches;
         ExportPlayedItem.IsEnabled = hasStore && !running;
         OpenGameItem.IsEnabled = view is not null && Puzzle.GameUrl.Length > 0;
@@ -489,7 +489,7 @@ public sealed partial class MainWindow : Window, IBoardView
         }
     }
 
-    private async void OnSavePgn(object sender, RoutedEventArgs e)
+    private async void OnExportPuzzlePgn(object sender, RoutedEventArgs e)
     {
         if (Puzzle.View is null)
         {
@@ -710,8 +710,9 @@ public sealed partial class MainWindow : Window, IBoardView
         var ui = _app.Ui.Value;
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         var scale = Win32Dpi.Scale(DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary));
-        var width = Math.Min(ui.WindowWidth > 0 ? ui.WindowWidth : (int)(1280 * scale), area.Width);
-        var height = Math.Min(ui.WindowHeight > 0 ? ui.WindowHeight : (int)(840 * scale), area.Height);
+        // Standard 6.1: a workspace opens at 1200 × 800 with a minimum of 800 × 560.
+        var width = Math.Min(ui.WindowWidth > 0 ? ui.WindowWidth : (int)(1200 * scale), area.Width);
+        var height = Math.Min(ui.WindowHeight > 0 ? ui.WindowHeight : (int)(800 * scale), area.Height);
         var saved = new RectInt32(ui.WindowX, ui.WindowY, width, height);
         var visible = ui.WindowX != int.MinValue
             && saved.X >= area.X - 32 && saved.Y >= area.Y - 8
@@ -719,8 +720,8 @@ public sealed partial class MainWindow : Window, IBoardView
         AppWindow.MoveAndResize(visible ? saved : new RectInt32(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height));
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.PreferredMinimumWidth = (int)(960 * scale);
-            presenter.PreferredMinimumHeight = (int)(640 * scale);
+            presenter.PreferredMinimumWidth = (int)(800 * scale);
+            presenter.PreferredMinimumHeight = (int)(560 * scale);
             if (ui.WindowMaximized)
             {
                 presenter.Maximize();

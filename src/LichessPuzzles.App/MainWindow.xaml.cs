@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window, IBoardView
     private bool _overlayOpen;
     private SettingsWindow? _settingsWindow;
     private bool _closePending;
+    private string _playersMenuKey = "";
 
     /// <summary>Set once the core has been released, so the window may close.</summary>
     public bool AllowClose { get; set; }
@@ -535,8 +536,24 @@ public sealed partial class MainWindow : Window, IBoardView
 
     private void RebuildPlayersMenu()
     {
-        PlayersMenu.Items.Clear();
         var player = _app.Player;
+        var key = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Current = player.Current?.Id,
+            player.Rated,
+            Players = player.Players.Select(p => new { p.Id, p.Name }).ToArray(),
+        });
+        if (key == _playersMenuKey)
+        {
+            return;
+        }
+        _playersMenuKey = key;
+        // MenuBarItem mirrors its items into a flyout. Remove individually: a vector Reset
+        // from Clear leaves old entries in that flyout, duplicating the entire menu on refresh.
+        while (PlayersMenu.Items.Count > 0)
+        {
+            PlayersMenu.Items.RemoveAt(PlayersMenu.Items.Count - 1);
+        }
         foreach (var p in player.Players)
         {
             var item = new RadioMenuFlyoutItem { Text = p.Name, GroupName = "players", IsChecked = p.Id == player.Current?.Id, Tag = p.Id };

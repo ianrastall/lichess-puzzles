@@ -39,8 +39,6 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty] public partial string EmptyMessage { get; set; } = "";
     [ObservableProperty] public partial string EmptyPrimaryText { get; set; } = "";
     [ObservableProperty] public partial bool ShowEmptyActions { get; set; }
-    /// <summary>The empty-state primary action resumes a paused download rather than starting one.</summary>
-    public bool EmptyPrimaryResumes { get; private set; }
 
     public void Apply(Status status)
     {
@@ -90,7 +88,7 @@ public sealed partial class StatusViewModel : ObservableObject
             {
                 var date = update.LastModified.Length > 0 ? Format.HttpDate(update.LastModified) : "a newer date";
                 var size = update.Length > 0 ? $", {Format.Megabytes(update.Length)}" : "";
-                SetNotice($"Update available ({date}{size})", InfoBarSeverity.Informational, EventAction.RetryDownload, fromEvent: false, actionText: "Download update");
+                SetNotice($"Update available ({date}{size})", InfoBarSeverity.Informational, EventAction.RetryDownload, fromEvent: false, actionText: "Get database…");
             }
             else
             {
@@ -100,7 +98,7 @@ public sealed partial class StatusViewModel : ObservableObject
 
         ShowEmptyState = status.Store is null;
         ShowEmptyActions = status.Store is null && op is null;
-        EmptyPrimaryResumes = status.PartialBytes > 0;
+        EmptyPrimaryText = "Import puzzle file…";
         if (status.Store is null)
         {
             if (op is { Kind: OperationKind.Build })
@@ -113,24 +111,15 @@ public sealed partial class StatusViewModel : ObservableObject
                 EmptyTitle = "Downloading puzzles";
                 EmptyMessage = "The download can be paused and resumed later.";
             }
-            else if (status.PartialBytes > 0)
-            {
-                var total = status.PartialTotal > 0 ? $" of {Format.Megabytes(status.PartialTotal)}" : "";
-                EmptyTitle = "Download paused";
-                EmptyMessage = $"Download paused at {Format.Megabytes(status.PartialBytes)}{total}.";
-                EmptyPrimaryText = "Resume download";
-            }
             else if (status.StoreProblem.StartsWith("No puzzles", StringComparison.Ordinal))
             {
                 EmptyTitle = "No puzzles installed";
-                EmptyMessage = "The Lichess puzzle database is about 300 MB to download and 500 MB once installed.";
-                EmptyPrimaryText = "Download puzzles";
+                EmptyMessage = "Choose the Lichess .csv or .csv.zst file you already downloaded. To get a new copy, open the Lichess download page, then import it here. You choose when to update.";
             }
             else
             {
                 EmptyTitle = "The puzzle store can't be read";
-                EmptyMessage = status.StoreProblem;
-                EmptyPrimaryText = status.Download is not null ? "Rebuild store" : "Download puzzles";
+                EmptyMessage = status.StoreProblem + " Import a local .csv or .csv.zst file to rebuild it.";
             }
         }
     }

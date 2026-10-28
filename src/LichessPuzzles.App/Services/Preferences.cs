@@ -37,10 +37,6 @@ public sealed class AppSettings
     /// <summary>PGN starts from the position the solver faces rather than the database FEN.</summary>
     public bool ExportPlayerStart { get; set; }
 
-    // Storage
-    public bool KeepDownload { get; set; } = true;
-    public bool CheckForUpdatesAtStart { get; set; } = true;
-
     public FilterState Filter { get; set; } = new();
     public List<FilterPreset> Presets { get; set; } = [];
 }

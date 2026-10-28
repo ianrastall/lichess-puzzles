@@ -1,5 +1,10 @@
 # Release notes
 
+## 3.1.0 — 27 October 2026
+
+- Import an existing Lichess CSV or compressed CSV beside the executable when no readable puzzle store is installed, including files downloaded outside the app without metadata.
+- Make local import the primary setup action. Desktop downloads and automatic update checks are replaced with a browser link to Lichess; users choose when to download and import updates. Original files are always retained. CLI download commands remain available.
+
 ## 3.0.0 — 25 October 2026
 
 The Jupiter rebuild of Lichess Puzzle Desktop, with a WinUI 3 shell and Rust core.

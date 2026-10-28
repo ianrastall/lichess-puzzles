@@ -63,8 +63,6 @@ public sealed partial class SettingsWindow : Window
         EvaluationSolvingSwitch.IsOn = settings.EvaluationWhileSolving;
         EvaluationSolvingSwitch.IsEnabled = settings.EvaluationEnabled;
         FillSeconds(EvaluationTimeBox, EvaluationChoices, settings.EvaluationSeconds);
-        KeepDownloadSwitch.IsOn = settings.KeepDownload;
-        CheckUpdatesSwitch.IsOn = settings.CheckForUpdatesAtStart;
         _loading = false;
     }
 
@@ -148,18 +146,6 @@ public sealed partial class SettingsWindow : Window
             _app.Settings.Value.EvaluationSeconds = EvaluationChoices[EvaluationTimeBox.SelectedIndex];
             Save();
         }
-    }
-
-    private void OnKeepDownloadToggled(object sender, RoutedEventArgs e)
-    {
-        _app.Settings.Value.KeepDownload = KeepDownloadSwitch.IsOn;
-        Save();
-    }
-
-    private void OnCheckUpdatesToggled(object sender, RoutedEventArgs e)
-    {
-        _app.Settings.Value.CheckForUpdatesAtStart = CheckUpdatesSwitch.IsOn;
-        Save();
     }
 
     private void OnShowFolder(object sender, RoutedEventArgs e) => _app.Host.OpenFolder(App.DataDirectory);

@@ -16,8 +16,7 @@
 
         <MenuBar x:Name="Menu">
             <MenuBarItem Title="File">
-                <MenuFlyoutItem x:Name="DownloadItem" Text="Download puzzles…" Click="OnDownload" />
-                <MenuFlyoutItem x:Name="CheckUpdateItem" Text="Check for update" Click="OnCheckUpdate" />
+                <MenuFlyoutItem Text="Get puzzle database from Lichess…" Click="OnGetDatabase" />
                 <MenuFlyoutItem x:Name="ImportItem" Text="Import puzzle file…" Click="OnImport" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="ExportMatchingItem" Text="Export matching puzzles…" Click="OnExportMatching">
@@ -195,7 +194,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ShowIf(Status.ShowEmptyActions), Mode=OneWay}">
                             <Button x:Name="EmptyPrimary" Content="{x:Bind Status.EmptyPrimaryText, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}"
                                     Click="OnEmptyPrimary" />
-                            <Button Content="Import puzzle file…" Click="OnImport" />
+                            <Button Content="Get database…" Click="OnGetDatabase" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

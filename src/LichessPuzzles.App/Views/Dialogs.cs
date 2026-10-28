@@ -219,7 +219,8 @@ public static class Dialogs
         {
             Row("State", status?.StoreProblem ?? "Unknown");
         }
-        Row("Downloaded file", status?.Download is not null ? "Kept for rebuilding" : "Not kept");
+        var localFile = PuzzleFiles.Find(AppContext.BaseDirectory, App.DataDirectory);
+        Row("Local puzzle file", localFile ?? "Use Import puzzle file to choose a file");
         if (status?.UpdateAvailable is { } update)
         {
             Row("Update", $"Available ({Format.HttpDate(update.LastModified)})");
@@ -240,14 +241,8 @@ public static class Dialogs
         var running = app.Status.IsRunning;
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
         var dialog = Create(root, "Database details", new ScrollViewer { Content = panel, MaxHeight = 520 });
-        var check = new Button { Content = "Check for update", IsEnabled = !running };
-        check.Click += async (_, _) =>
-        {
-            dialog.Hide();
-            await app.Host.Try(c => c.CheckForUpdate(), "Checking for an update failed");
-        };
-        var rebuild = new Button { Content = "Rebuild store", IsEnabled = !running && status?.Download is not null };
-        ToolTipService.SetToolTip(rebuild, status?.Download is not null ? "Build the store again from the downloaded file" : "Available when the downloaded file is kept");
+        var rebuild = new Button { Content = "Rebuild store", IsEnabled = !running && localFile is not null };
+        ToolTipService.SetToolTip(rebuild, localFile is not null ? "Build the store again from the local puzzle file" : "Use Import puzzle file to choose a file");
         rebuild.Click += async (_, _) =>
         {
             dialog.Hide();
@@ -259,7 +254,6 @@ public static class Dialogs
             dialog.Hide();
             window.StartImport();
         };
-        actions.Children.Add(check);
         actions.Children.Add(rebuild);
         actions.Children.Add(import);
         panel.Children.Add(actions);

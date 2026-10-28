@@ -15,7 +15,6 @@ public partial class App : Application
     private EventWaitHandle? _showSignal;
     private string _storeKey = "";
     private bool _exiting;
-    private bool _checkedForUpdate;
 
     public App()
     {
@@ -121,6 +120,10 @@ public partial class App : Application
             var rated = Settings.Value.Rated;
             await Host.Try(c => c.SetRated(rated), "The rated setting could not be applied");
             await Player.RefreshAsync();
+            if (core.GetStatus().Store is null && PuzzleFiles.Find(AppContext.BaseDirectory, DataDirectory) is { } input)
+            {
+                await Host.Try(c => c.StartBuild(input, keepDownload: true), "The local puzzle file could not be imported");
+            }
             await RefreshAsync();
         }
         catch (PuzzleCoreException e)
@@ -153,14 +156,6 @@ public partial class App : Application
             {
                 _storeKey = key;
                 await OnStoreChangedAsync(status.Store is not null);
-            }
-            if (!_checkedForUpdate && status.Store is not null && status.Operation is null)
-            {
-                _checkedForUpdate = true;
-                if (Settings.Value.CheckForUpdatesAtStart)
-                {
-                    await Host.Try(c => c.CheckForUpdate(), "Checking for an update failed");
-                }
             }
         }
         catch (PuzzleCoreException e)

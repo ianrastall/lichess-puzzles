@@ -6,6 +6,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\LichessPuzzles.App\Services\PuzzleFiles.cs" Link="PuzzleFiles.cs" />
     <ProjectReference Include="..\..\src\LichessPuzzles.Interop\LichessPuzzles.Interop.csproj" />
   </ItemGroup>
   <ItemGroup>

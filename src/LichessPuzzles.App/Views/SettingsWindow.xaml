@@ -67,14 +67,7 @@
                                 <Button Grid.Column="1" Content="Show folder" Click="OnShowFolder" VerticalAlignment="Top" />
                             </Grid>
                         </StackPanel>
-                        <StackPanel Spacing="4">
-                            <ToggleSwitch x:Name="KeepDownloadSwitch" Header="Keep the downloaded file after building" Toggled="OnKeepDownloadToggled" />
-                            <TextBlock Style="{StaticResource JupiterCaptionTextStyle}" Text="About 300 MB. It lets the store be rebuilt without downloading again. Applies to the next build." />
-                        </StackPanel>
-                        <StackPanel Spacing="4">
-                            <ToggleSwitch x:Name="CheckUpdatesSwitch" Header="Check for updates when the app starts" Toggled="OnCheckUpdatesToggled" />
-                            <TextBlock Style="{StaticResource JupiterCaptionTextStyle}" Text="One request to database.lichess.org; nothing is downloaded without your choice." />
-                        </StackPanel>
+                        <TextBlock Style="{StaticResource JupiterCaptionTextStyle}" Text="Download puzzle files from Lichess when you choose, then use File > Import puzzle file to install them. Imported files are kept." />
                     </StackPanel>
                 </StackPanel>
             </StackPanel>

@@ -1,8 +1,8 @@
 # Lichess Puzzles
 
-A Windows desktop app for downloading, filtering and playing the [Lichess puzzle database](https://database.lichess.org/#puzzles) offline. Part of the Jupiter family.
+A Windows desktop app for importing, filtering and playing the [Lichess puzzle database](https://database.lichess.org/#puzzles) offline. Part of the Jupiter family.
 
-Version 3.0.0 is the Jupiter rebuild of Lichess Puzzle Desktop. The app downloads, filters and plays puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer. See the [release notes](CHANGELOG.md) and [validation record](docs/release-3.0.0.md).
+Version 3.1.0 adds local database discovery and user-managed downloads to the Jupiter rebuild of Lichess Puzzle Desktop. The app imports, filters and plays puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer. See the [release notes](CHANGELOG.md) and [validation record](docs/release-3.1.0.md).
 
 [Download the Windows installer](https://github.com/ianrastall/lichess-puzzles/releases/latest).
 
@@ -19,7 +19,9 @@ The rebuild and predecessor histories are both retained in this repository. The 
 
 Install with `dist/LichessPuzzles-<version>-win-x64-setup.exe`. It installs for your Windows account without an administrator prompt, adds **Lichess Puzzles** to Start, and can be removed from **Settings > Apps > Installed apps**; puzzles, players and history are kept. The installer is not signed, so SmartScreen may ask you to confirm. Alternatively run `LichessPuzzles.exe` from `dist/LichessPuzzles` or the zip. Windows 11 24H2 or newer, x64; no separate runtime installation is needed.
 
-On first run the app offers to download the Lichess puzzle database (about 300 MB) and build the store (about 500 MB, half a minute), or to import a `.csv` or `.csv.zst` you already have. Filters apply as they change and can be saved as presets. **Next puzzle** (Ctrl+N) draws a matching puzzle at random or near your rating, optionally skipping puzzles you have played. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
+Download the puzzle database from [Lichess](https://database.lichess.org/#puzzles) whenever you choose, then use **File > Import puzzle file…** to select your `.csv` or `.csv.zst`. With no readable store installed, the app automatically imports `lichess_db_puzzle.csv.zst` or `lichess_db_puzzle.csv` found beside the executable, in the data folder, or in its legacy `source` subfolder (in that order). It builds the offline store and keeps your original file; no download record is required. An existing store stays in use until you explicitly import an updated file. **File > Get puzzle database from Lichess…** opens the download page in your browser. The desktop app does not download files or check for updates itself; the CLI download commands remain available.
+
+Filters apply as they change and can be saved as presets. **Next puzzle** (Ctrl+N) draws a matching puzzle at random or near your rating, optionally skipping puzzles you have played. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
 
 Each player has a Glicko-2 puzzle rating starting at 1500 ± 350; a `?` marks it provisional while the deviation is above 110. With **Rated** on, your first attempt at a puzzle is a game against it, using its rating and deviation from the database. The first wrong move, hint or solution makes it a loss, and a solve without them a win. Leaving a puzzle after playing in it counts as a loss. Replays are not rated. **History** lists every attempt.
 

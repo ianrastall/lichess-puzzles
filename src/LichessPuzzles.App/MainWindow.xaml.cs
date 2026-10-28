@@ -141,9 +141,6 @@ public sealed partial class MainWindow : Window, IBoardView
         var hasStore = Status.HasStore;
         var running = Status.IsRunning;
         var view = Puzzle.View;
-        DownloadItem.Text = Status.Status?.UpdateAvailable is not null ? "Download update…" : "Download puzzles…";
-        DownloadItem.IsEnabled = !running;
-        CheckUpdateItem.IsEnabled = !running;
         ImportItem.IsEnabled = !running;
         NextItem.IsEnabled = Puzzle.CanNext;
         HintItem.IsEnabled = Puzzle.CanHint;
@@ -321,11 +318,13 @@ public sealed partial class MainWindow : Window, IBoardView
 
     // Menu commands -------------------------------------------------------------------------------
 
-    private async void OnDownload(object sender, RoutedEventArgs e) =>
-        await _app.Host.Try(c => c.StartDownload(_app.Settings.Value.KeepDownload), "The download could not start");
-
-    private async void OnCheckUpdate(object sender, RoutedEventArgs e) =>
-        await _app.Host.Try(c => c.CheckForUpdate(), "Checking for an update failed");
+    private async void OnGetDatabase(object sender, RoutedEventArgs e)
+    {
+        if (!await Launcher.LaunchUriAsync(new Uri(PuzzleFiles.DownloadPage)))
+        {
+            Status.Report("The Lichess download page could not be opened. Visit database.lichess.org to get the puzzle file, then import it here.");
+        }
+    }
 
     private async void OnImport(object sender, RoutedEventArgs e)
     {
@@ -342,13 +341,13 @@ public sealed partial class MainWindow : Window, IBoardView
 
     private async void OnEmptyPrimary(object sender, RoutedEventArgs e)
     {
-        if (Status.EmptyPrimaryText == "Rebuild store")
+        if (PuzzleFiles.Find(AppContext.BaseDirectory, App.DataDirectory) is { } input)
         {
-            await _app.Host.Try(c => c.StartBuild("", _app.Settings.Value.KeepDownload), "The rebuild could not start");
+            await _app.Host.Try(c => c.StartBuild(input, keepDownload: true), "The local puzzle file could not be imported");
         }
         else
         {
-            await _app.Host.Try(c => c.StartDownload(_app.Settings.Value.KeepDownload), "The download could not start");
+            OnImport(sender, e);
         }
     }
 
@@ -358,20 +357,19 @@ public sealed partial class MainWindow : Window, IBoardView
 
     private async void OnNoticeAction(object sender, RoutedEventArgs e)
     {
-        var keep = _app.Settings.Value.KeepDownload;
         var action = Status.NoticeAction;
         var path = Status.NoticePath;
         Status.DismissNotice();
         switch (action)
         {
             case EventAction.RetryDownload:
-                await _app.Host.Try(c => c.StartDownload(keep), "The download could not start");
+                OnGetDatabase(sender, e);
                 break;
             case EventAction.RetryBuild:
-                await _app.Host.Try(c => c.StartBuild("", keep), "The build could not start");
+                OnEmptyPrimary(sender, e);
                 break;
             case EventAction.RetryCheck:
-                await _app.Host.Try(c => c.CheckForUpdate(), "Checking for an update failed");
+                OnGetDatabase(sender, e);
                 break;
             case EventAction.SwitchStore:
                 await _app.Host.Try(c => c.SwitchStore(), "Switching to the new puzzles failed");
@@ -393,8 +391,17 @@ public sealed partial class MainWindow : Window, IBoardView
 
     private async void OnDatabaseDetails(object sender, RoutedEventArgs e) => await Dialogs.ShowDatabaseAsync(Root.XamlRoot, _app, this);
 
-    public async Task StartRebuildAsync() =>
-        await _app.Host.Try(c => c.StartBuild("", _app.Settings.Value.KeepDownload), "The rebuild could not start");
+    public async Task StartRebuildAsync()
+    {
+        if (PuzzleFiles.Find(AppContext.BaseDirectory, App.DataDirectory) is { } input)
+        {
+            await _app.Host.Try(c => c.StartBuild(input, keepDownload: true), "The rebuild could not start");
+        }
+        else
+        {
+            StartImport();
+        }
+    }
 
     public void StartImport() => OnImport(this, new RoutedEventArgs());
 

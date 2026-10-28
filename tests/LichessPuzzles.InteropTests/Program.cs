@@ -1,5 +1,6 @@
 using Jupiter.LichessPuzzles.Interop;
 using Jupiter.LichessPuzzles.Messages;
+using Jupiter.LichessPuzzles.App.Services;
 
 var failures = 0;
 void Check(bool ok, string what)
@@ -38,6 +39,35 @@ var root = Path.Combine(Path.GetTempPath(), $"lpz-interop-{Environment.ProcessId
 var sample = Path.Combine(AppContext.BaseDirectory, "sample_puzzles.csv");
 try
 {
+    // Reproduce a manually downloaded database beside the executable, without download.json.
+    var appDirectory = Path.Combine(root, "portable app");
+    var dataDirectory = Path.Combine(root, "user data");
+    Directory.CreateDirectory(appDirectory);
+    Directory.CreateDirectory(Path.Combine(dataDirectory, "source"));
+    Check(PuzzleFiles.Find(appDirectory, dataDirectory) is null, "no local database offers manual import");
+    var legacyFile = Path.Combine(dataDirectory, "source", "lichess_db_puzzle.csv.zst");
+    File.WriteAllText(legacyFile + ".part", "incomplete");
+    Check(PuzzleFiles.Find(appDirectory, dataDirectory) is null, "partial download is not imported");
+    File.WriteAllText(legacyFile, "discovery fixture");
+    Check(PuzzleFiles.Find(appDirectory, dataDirectory) == legacyFile, "legacy source file needs no metadata");
+    var dataFile = Path.Combine(dataDirectory, "lichess_db_puzzle.csv");
+    File.Copy(sample, dataFile);
+    Check(PuzzleFiles.Find(appDirectory, dataDirectory) == dataFile, "data folder takes precedence over legacy source");
+    var localFile = Path.Combine(appDirectory, "lichess_db_puzzle.csv");
+    File.Copy(sample, localFile);
+    Check(PuzzleFiles.Find(appDirectory, dataDirectory) == localFile, "CSV beside executable takes precedence over data folder");
+    var compressedFile = localFile + ".zst";
+    File.WriteAllText(compressedFile, "discovery fixture");
+    Check(PuzzleFiles.Find(appDirectory, dataDirectory) == compressedFile, "compressed CSV beside executable is detected");
+    File.Delete(compressedFile);
+    var original = File.ReadAllBytes(localFile);
+    using (var core = PuzzleCore.Create(Path.Combine(root, "discovery store"), "http://127.0.0.1:9/unused", "Tester"))
+    {
+        core.StartBuild(PuzzleFiles.Find(appDirectory, dataDirectory)!, keepDownload: true);
+        Check(WaitForOperation(core).Store?.PuzzleCount == 13, "discovered local database installs without a network connection");
+        Check(File.ReadAllBytes(localFile).SequenceEqual(original), "import preserves the user's database");
+    }
+
     using (var core = PuzzleCore.Create(root, "http://127.0.0.1:9/unused", "Tester"))
     {
         var status = core.GetStatus();

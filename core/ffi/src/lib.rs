@@ -124,14 +124,20 @@ pub fn dispatch(service: &Service, req: messages::Request) -> messages::Response
                 Err(e) => service_error(id, e),
             }
         }
-        Some(C::NextPuzzle(n)) => session(service.next_selected(
-            n.near_rating.then_some(n.offset),
-            lichess_puzzles_core::service::SelectionOptions::new(n.rating_window, n.exclude_short_mates),
-        )),
-        Some(C::PrepareNext(n)) => finish(service.prepare_next(
-            n.near_rating.then_some(n.offset),
-            lichess_puzzles_core::service::SelectionOptions::new(n.rating_window, n.exclude_short_mates),
-        )),
+        Some(C::NextPuzzle(n)) => session(
+            service.next_selected(
+                n.near_rating.then_some(n.offset),
+                lichess_puzzles_core::service::SelectionOptions::new(n.rating_window, n.exclude_short_mates)
+                    .with_engine_screening(n.skip_shallow_solutions),
+            ),
+        ),
+        Some(C::PrepareNext(n)) => finish(
+            service.prepare_next(
+                n.near_rating.then_some(n.offset),
+                lichess_puzzles_core::service::SelectionOptions::new(n.rating_window, n.exclude_short_mates)
+                    .with_engine_screening(n.skip_shallow_solutions),
+            ),
+        ),
         Some(C::LoadPuzzle(p)) => session(service.load_puzzle(&p.id, p.replay)),
         Some(C::Session(s)) => {
             let command = match s.command {

@@ -1,5 +1,13 @@
 # Release notes
 
+## 3.3.0 — 30 October 2026
+
+- Add optional **Skip shallow engine solutions**, a second opinion from the existing Rust engine. Before presentation, independently search every solver turn along the recorded line; skip only complete reviews that agree from depth one through every observed deeper iteration, with at least two observations per turn. Disagreement and budget exhaustion do not reject a puzzle.
+- Keep this experimental filter off by default, persist it in settings and presets, and revalidate prepared candidates when it changes. Original files, puzzle ratings, exports, local player ratings and first-attempt settlement are retained.
+- Limit each review to 50,000 nodes and a soft 75 ms budget across the whole puzzle, depth four per solver turn, using a smaller transposition table. Interrupted iterations are never reported as completed results. Cache only completed reviews in a separate disposable `engine-review.sqlite`.
+- Add `review` to the CLI for individual and reproducible sampled reports, per-depth agreement and stability, solver-relative evaluation and JSON Lines output. This command does not play puzzles or change selection.
+- Validate the signal on two 600-puzzle samples across six rating bands, including a cohort controlling solution length, mate tags, rating deviation and plays. Document the limitations rather than translating engine effort into an invented rating.
+
 ## 3.2.0 — 30 October 2026
 
 - Move the current player's rating into a labeled section at the top of the puzzle pane, visible in both Puzzle and History. Show provisional status, rating deviation and rated-puzzle count without requiring a tooltip.

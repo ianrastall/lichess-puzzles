@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use super::{Service, ServiceError, SessionResult};
 use crate::filter::{self, CompiledFilter};
+use crate::review::{ReviewCache, ReviewLimits};
 use crate::screening::{self, ScreeningCache, Verdict};
 use crate::store::Store;
 
@@ -19,6 +20,7 @@ const BATCH_TIME: Duration = Duration::from_millis(750);
 pub struct SelectionOptions {
     pub rating_window: u16,
     pub exclude_short_mates: u8,
+    pub skip_shallow_solutions: bool,
 }
 
 #[cfg(test)]
@@ -58,6 +60,41 @@ mod tests {
 
     fn exact(rating: u16) -> Filter {
         Filter { rating_min: Some(rating), rating_max: Some(rating), ..Default::default() }
+    }
+
+    #[test]
+    fn engine_screening_rejects_a_shallow_nonmate_without_writing_attempts() {
+        let header = sample().lines().next().unwrap().to_owned();
+        let csv = format!(
+            "{header}\n00008,4k3/8/8/3q4/8/8/3R4/3K4 b - - 0 1,e8f8 d2d5,1500,80,100,1000,hangingPiece short,https://lichess.org/test,,\n"
+        );
+        let (dir, service) = setup(&csv);
+        let before = std::fs::read(dir.path().join(crate::STORE_FILE)).unwrap();
+        let player = service.players(0).unwrap();
+        // A candidate prepared by exact-mate screening must not bypass a newly
+        // enabled engine screen, even when the filter/player/store are unchanged.
+        service.prepare_next(None, SelectionOptions::new(150, 1)).unwrap();
+        let options = SelectionOptions::new(150, 1).with_engine_screening(true);
+        assert!(matches!(service.prepare_next(None, options), Err(ServiceError::Selection(_))));
+        assert!(matches!(service.next_selected(None, options), Err(ServiceError::Selection(_))));
+        assert_eq!(service.players(0).unwrap(), player);
+        assert!(service.history(100).unwrap().is_empty());
+        assert_eq!(std::fs::read(dir.path().join(crate::STORE_FILE)).unwrap(), before);
+        assert!(dir.path().join("engine-review.sqlite").is_file());
+        assert_eq!(service.next_selected(None, SelectionOptions::default()).unwrap().view.puzzle.id, "00008");
+    }
+
+    #[test]
+    fn engine_disagreement_is_not_rejected() {
+        let (dir, service) = setup(&sample());
+        service.set_filter(exact(1554), false).unwrap();
+        let options = SelectionOptions::default().with_engine_screening(true);
+        assert!(matches!(service.next_selected(None, options), Err(ServiceError::Selection(_))));
+        service.set_filter(exact(2671), false).unwrap();
+        let result = service.next_selected(None, options).unwrap();
+        assert_eq!(result.view.puzzle.id, "00sJ9");
+        assert!(service.history(100).unwrap().is_empty());
+        assert!(dir.path().join("engine-review.sqlite").is_file());
     }
 
     #[test]
@@ -186,7 +223,7 @@ mod tests {
 
 impl Default for SelectionOptions {
     fn default() -> Self {
-        Self { rating_window: 150, exclude_short_mates: 0 }
+        Self { rating_window: 150, exclude_short_mates: 0, skip_shallow_solutions: false }
     }
 }
 
@@ -195,7 +232,13 @@ impl SelectionOptions {
         Self {
             rating_window: if window == 0 { 150 } else { window.min(600) as u16 },
             exclude_short_mates: mates.min(2) as u8,
+            skip_shallow_solutions: false,
         }
+    }
+
+    pub fn with_engine_screening(mut self, enabled: bool) -> Self {
+        self.skip_shallow_solutions = enabled;
+        self
     }
 }
 
@@ -206,6 +249,7 @@ pub(super) struct SelectionState {
     candidates: VecDeque<usize>,
     ready: Option<usize>,
     cache: Option<ScreeningCache>,
+    review_cache: Option<ReviewCache>,
 }
 
 /// Inputs captured together under state_gate. Only the snapshot owns a strong store reference.
@@ -260,7 +304,7 @@ impl Service {
 
     /// Prepares without settling the active attempt. Next revalidates every input at commit.
     pub fn prepare_next(&self, near_offset: Option<i32>, options: SelectionOptions) -> Result<(), ServiceError> {
-        if options.exclude_short_mates > 0 {
+        if options.exclude_short_mates > 0 || options.skip_shallow_solutions {
             self.select_index(&self.selection_snapshot(near_offset, options)?, false)?;
         }
         Ok(())
@@ -273,7 +317,8 @@ impl Service {
     ) -> Result<SelectionSnapshot, ServiceError> {
         let _state = self.inner.state_gate.lock().unwrap();
         let store = self.store()?;
-        let options = SelectionOptions::new(options.rating_window.into(), options.exclude_short_mates.into());
+        let options = SelectionOptions::new(options.rating_window.into(), options.exclude_short_mates.into())
+            .with_engine_screening(options.skip_shallow_solutions);
         let (player, current_id, pending_attempt) = self.inner.selection_player()?;
         let current = current_id.and_then(|id| store.find(&id));
         let filter = self.inner.filter.lock().unwrap().clone();
@@ -299,12 +344,13 @@ impl Service {
             );
         }
         let key = format!(
-            "{:p}:{}:{:?}:{}:{}:{}:{}",
+            "{:p}:{}:{:?}:{}:{}:{}:{}:{}",
             Arc::as_ptr(&store),
             player.id,
             near_offset,
             options.rating_window,
             options.exclude_short_mates,
+            options.skip_shallow_solutions,
             skip_played,
             serde_json::to_string(&filter).expect("filter serialization")
         );
@@ -332,7 +378,7 @@ impl Service {
                 ServiceError::NoMatches
             }
         };
-        if options.exclude_short_mates == 0 {
+        if options.exclude_short_mates == 0 && !options.skip_shallow_solutions {
             return filter::pick(store, compiled, seed).ok_or_else(empty);
         }
 
@@ -351,10 +397,16 @@ impl Service {
             }
             return Ok(index);
         }
-        if state.cache.is_none() {
+        if options.exclude_short_mates > 0 && state.cache.is_none() {
             state.cache = Some(
                 ScreeningCache::open(&self.inner.data_dir.join("screening.sqlite"))
                     .map_err(|e| ServiceError::Io(format!("The screening cache could not be opened: {e}")))?,
+            );
+        }
+        if options.skip_shallow_solutions && state.review_cache.is_none() {
+            state.review_cache = Some(
+                ReviewCache::open(&self.inner.data_dir.join("engine-review.sqlite"))
+                    .map_err(|e| ServiceError::Io(format!("The engine review cache could not be opened: {e}")))?,
             );
         }
         let mut refilled = false;
@@ -372,25 +424,39 @@ impl Service {
                 continue;
             }
             let puzzle = store.puzzle(index).map_err(ServiceError::Store)?;
-            let board = screening::solver_board(&puzzle).map_err(|e| ServiceError::Io(e.to_string()))?;
-            let (verdict, _) = state
-                .cache
-                .as_ref()
-                .unwrap()
-                .inspect(&board)
-                .map_err(|e| ServiceError::Io(format!("The screening result could not be saved: {e}")))?;
-            let accepted = match verdict {
-                Verdict::Mate(n) => n > options.exclude_short_mates,
-                Verdict::NoShortMate => true,
-                Verdict::Inconclusive => false,
-            };
-            if accepted {
-                if !consume {
-                    state.ready = Some(index);
+            if options.exclude_short_mates > 0 {
+                let board = screening::solver_board(&puzzle).map_err(|e| ServiceError::Io(e.to_string()))?;
+                let (verdict, _) = state
+                    .cache
+                    .as_ref()
+                    .unwrap()
+                    .inspect(&board)
+                    .map_err(|e| ServiceError::Io(format!("The screening result could not be saved: {e}")))?;
+                let accepted = match verdict {
+                    Verdict::Mate(n) => n > options.exclude_short_mates,
+                    Verdict::NoShortMate => true,
+                    Verdict::Inconclusive => false,
+                };
+                if !accepted {
+                    continue;
                 }
-                return Ok(index);
             }
+            if options.skip_shallow_solutions {
+                let (review, _) = state
+                    .review_cache
+                    .as_ref()
+                    .unwrap()
+                    .inspect(&puzzle, ReviewLimits::default())
+                    .map_err(|e| ServiceError::Io(format!("The engine review could not be completed: {e}")))?;
+                if review.shallow_agreement() {
+                    continue;
+                }
+            }
+            if !consume {
+                state.ready = Some(index);
+            }
+            return Ok(index);
         }
-        Err(ServiceError::Selection("No puzzle passed screening in this batch. Try Next puzzle again, change the filters, or turn off short-mate screening. Unfinished checks are not treated as evidence that a puzzle is difficult.".into()))
+        Err(ServiceError::Selection("No puzzle passed screening in this batch. Try Next puzzle again, change the filters, or turn off screening. Unfinished checks are not treated as evidence that a puzzle is difficult.".into()))
     }
 }

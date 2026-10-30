@@ -188,9 +188,13 @@ public sealed partial class FilterViewModel : ObservableObject
     [ObservableProperty]
     public partial int ScreeningIndex { get; set; }
 
+    [ObservableProperty]
+    public partial bool SkipShallowSolutions { get; set; }
+
     private int RatingWindow => RatingWindowIndex switch { 0 => 75, 2 => 300, _ => 150 };
     partial void OnRatingWindowIndexChanged(int value) => Changed();
     partial void OnScreeningIndexChanged(int value) => Changed();
+    partial void OnSkipShallowSolutionsChanged(bool value) => Changed();
 
     public bool IsNearRating => ChooseIndex == 1;
 
@@ -369,6 +373,7 @@ public sealed partial class FilterViewModel : ObservableObject
         DifficultyOffset = saved.DifficultyOffset;
         RatingWindowIndex = saved.RatingWindow switch { 75 => 0, 300 => 2, _ => 1 };
         ScreeningIndex = Math.Clamp(saved.ExcludeShortMates, 0, 2);
+        SkipShallowSolutions = saved.SkipShallowSolutions;
         SkipPlayed = saved.SkipPlayed;
     }
 
@@ -509,6 +514,7 @@ public sealed partial class FilterViewModel : ObservableObject
         f.SkipPlayed = SkipPlayed;
         f.RatingWindow = RatingWindow;
         f.ExcludeShortMates = Math.Clamp(ScreeningIndex, 0, 2);
+        f.SkipShallowSolutions = SkipShallowSolutions;
         _settings.Save();
     }
 

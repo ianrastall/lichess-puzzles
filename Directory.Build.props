@@ -3,7 +3,7 @@
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>3.2.0</Version>
+    <Version>3.3.0</Version>
     <Authors>Ian Rastall</Authors>
     <Product>Jupiter · Lichess Puzzles</Product>
     <Platforms>x64</Platforms>

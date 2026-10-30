@@ -9,6 +9,7 @@ pub mod export;
 pub mod filter;
 pub mod players;
 pub mod puzzle_id;
+pub mod review;
 pub mod screening;
 pub mod service;
 pub mod session;

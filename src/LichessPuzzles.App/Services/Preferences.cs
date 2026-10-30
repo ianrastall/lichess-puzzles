@@ -67,6 +67,7 @@ public sealed class FilterState
     public bool NearRating { get; set; } = true;
     public int RatingWindow { get; set; } = 150;
     public int ExcludeShortMates { get; set; }
+    public bool SkipShallowSolutions { get; set; }
     public int DifficultyOffset { get; set; }
     public bool SkipPlayed { get; set; } = true;
 

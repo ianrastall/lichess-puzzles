@@ -196,6 +196,21 @@ try
         core.SetFilter(new Filter { ThemesAny = { "mateIn1" } });
         Check(core.NextPuzzle(false, 0, 150, 0).View.Puzzle.Id == "0000H", "screening off restores excluded source puzzles");
         Check(File.Exists(Path.Combine(root, "screening", "screening.sqlite")), "screening cache is separate from source and history");
+        core.LoadPuzzle("0000D");
+        var beforeEngine = core.GetPlayers(DateTimeOffset.Now).Players[0].Games;
+        var storeBeforeEngine = File.ReadAllBytes(Path.Combine(root, "screening", "puzzles.store"));
+        Expect(() => core.NextPuzzle(skipShallowSolutions: true), PuzzleErrorKind.Selection, "engine screening excludes a consistently shallow solution");
+        Check(core.GetSession().View.Puzzle.Id == "0000D" && core.GetPlayers(DateTimeOffset.Now).Players[0].Games == beforeEngine,
+            "engine rejection preserves the active puzzle and player rating");
+        Check(storeBeforeEngine.SequenceEqual(File.ReadAllBytes(Path.Combine(root, "screening", "puzzles.store"))),
+            "engine screening preserves the puzzle store");
+        core.SetFilter(new Filter { RatingMin = 2671, RatingMax = 2671 });
+        core.PrepareNext(false, 0, 150, 0, true);
+        Check(core.GetSession().View.Puzzle.Id == "0000D", "engine preparation does not start an attempt");
+        Check(core.NextPuzzle(skipShallowSolutions: true).View.Puzzle.Id == "00sJ9", "engine disagreement or incomplete work remains available");
+        Check(File.Exists(Path.Combine(root, "screening", "engine-review.sqlite")), "engine review cache is separate from player history");
+        core.SetFilter(new Filter { ThemesAny = { "mateIn1" } });
+        Check(core.NextPuzzle().View.Puzzle.Id == "0000H", "turning engine screening off restores the source selection");
     }
 
     // A second core reopens the installed store.

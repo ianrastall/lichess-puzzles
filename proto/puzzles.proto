@@ -65,6 +65,8 @@ message NextPuzzle {
   uint32 rating_window = 3;
   // 0 off, 1 exclude proven mate in one, 2 exclude proven mate in one/two.
   uint32 exclude_short_mates = 4;
+  // Experimental: skip complete, consistent shallow-engine agreement on every solver turn.
+  bool skip_shallow_solutions = 5;
 }
 message LoadPuzzle {
   // Puzzle id or lichess.org training link.

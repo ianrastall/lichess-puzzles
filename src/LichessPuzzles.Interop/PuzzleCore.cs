@@ -132,16 +132,17 @@ public sealed class PuzzleCore : IDisposable
         Call(new Request { SetFilter = new SetFilter { Filter = filter, SkipPlayed = skipPlayed } }).Counts;
 
     /// <summary>Starts a random puzzle matching the current filter, optionally near the player's rating plus an offset.</summary>
-    public SessionResult NextPuzzle(bool nearRating = false, int offset = 0, int ratingWindow = 150, int excludeShortMates = 0) =>
-        Call(new Request { NextPuzzle = Selection(nearRating, offset, ratingWindow, excludeShortMates) }).Session;
+    public SessionResult NextPuzzle(bool nearRating = false, int offset = 0, int ratingWindow = 150, int excludeShortMates = 0, bool skipShallowSolutions = false) =>
+        Call(new Request { NextPuzzle = Selection(nearRating, offset, ratingWindow, excludeShortMates, skipShallowSolutions) }).Session;
 
-    public void PrepareNext(bool nearRating, int offset, int ratingWindow, int excludeShortMates) =>
-        Call(new Request { PrepareNext = Selection(nearRating, offset, ratingWindow, excludeShortMates) });
+    public void PrepareNext(bool nearRating, int offset, int ratingWindow, int excludeShortMates, bool skipShallowSolutions = false) =>
+        Call(new Request { PrepareNext = Selection(nearRating, offset, ratingWindow, excludeShortMates, skipShallowSolutions) });
 
-    private static NextPuzzle Selection(bool near, int offset, int window, int mates) => new()
+    private static NextPuzzle Selection(bool near, int offset, int window, int mates, bool shallow) => new()
     {
         NearRating = near, Offset = offset, RatingWindow = (uint)Math.Clamp(window, 1, 600),
         ExcludeShortMates = (uint)Math.Clamp(mates, 0, 2),
+        SkipShallowSolutions = shallow,
     };
 
     /// <summary>Starts a puzzle by id or lichess.org training link.</summary>

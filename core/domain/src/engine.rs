@@ -50,6 +50,8 @@ struct Searcher<'a> {
     history: Box<[[i32; 64]; 64]>,
     path: Vec<u64>,
     nodes: u64,
+    node_limit: u64,
+    clock_mask: u64,
     deadline: Instant,
     stop: &'a AtomicBool,
     stopped: bool,
@@ -71,6 +73,8 @@ pub fn analyse(
         history: Box::new([[0; 64]; 64]),
         path: Vec::with_capacity(MAX_PLY),
         nodes: 0,
+        node_limit: u64::MAX,
+        clock_mask: 2047,
         deadline: started + limit,
         stop,
         stopped: false,
@@ -105,6 +109,81 @@ pub fn analyse(
         }
     }
     last
+}
+
+/// Completed iterations from a small, strictly bounded screening search. An interrupted
+/// iteration is never reported, even when it is the first one. Scores are not puzzle ratings.
+#[derive(Debug, Clone)]
+pub struct ProbeSearch {
+    pub iterations: Vec<SearchInfo>,
+    pub nodes: u64,
+    pub elapsed: Duration,
+    pub budget_exhausted: bool,
+    pub complete: bool,
+}
+
+/// Uses a 32K-entry transposition table and checks the node limit on every visit. The time
+/// limit is a soft guard polled every 256 nodes; allocation and result formatting add overhead.
+pub fn probe(board: &Board, nodes: u64, limit: Duration, depth: u32, stop: &AtomicBool) -> ProbeSearch {
+    let started = Instant::now();
+    let mut result = ProbeSearch {
+        iterations: Vec::new(),
+        nodes: 0,
+        elapsed: Duration::ZERO,
+        budget_exhausted: false,
+        complete: false,
+    };
+    if nodes == 0 || limit.is_zero() || stop.load(Ordering::Relaxed) {
+        result.budget_exhausted = true;
+        result.elapsed = started.elapsed();
+        return result;
+    }
+    if board.status() != cozy_chess::GameStatus::Ongoing {
+        return result;
+    }
+    let mut searcher = Searcher {
+        tt: vec![TtEntry::default(); 1 << 15],
+        killers: [[None; 2]; MAX_PLY],
+        history: Box::new([[0; 64]; 64]),
+        path: Vec::with_capacity(MAX_PLY),
+        nodes: 0,
+        node_limit: nodes,
+        clock_mask: 255,
+        deadline: started + limit,
+        stop,
+        stopped: false,
+    };
+    for depth in 1..=depth.clamp(1, MAX_PLY as u32 - 8) {
+        if Instant::now() >= searcher.deadline || stop.load(Ordering::Relaxed) {
+            searcher.stopped = true;
+            break;
+        }
+        let score = searcher.negamax(board, depth as i32, 0, -INFINITY, INFINITY);
+        if searcher.stopped {
+            break;
+        }
+        let pv = searcher.principal_variation(board);
+        if pv.is_empty() {
+            break;
+        }
+        result.iterations.push(SearchInfo {
+            depth,
+            score: white_score(board, score),
+            pv_san: san_line(board, &pv),
+            pv_uci: uci_line(board, &pv),
+            nodes: searcher.nodes,
+            elapsed: started.elapsed(),
+        });
+        if score.abs() > MATE - MAX_PLY as i32 && (MATE - score.abs()) < depth as i32 {
+            result.complete = true;
+            break;
+        }
+    }
+    result.complete |= result.iterations.last().is_some_and(|i| i.depth == depth.clamp(1, MAX_PLY as u32 - 8));
+    result.nodes = searcher.nodes;
+    result.budget_exhausted = searcher.stopped;
+    result.elapsed = started.elapsed();
+    result
 }
 
 fn white_score(board: &Board, score: i32) -> Score {
@@ -169,7 +248,10 @@ fn piece_value(piece: Piece) -> i32 {
 
 impl Searcher<'_> {
     fn out_of_time(&mut self) -> bool {
-        if self.nodes & 2047 == 0 && (Instant::now() >= self.deadline || self.stop.load(Ordering::Relaxed)) {
+        if self.nodes >= self.node_limit
+            || (self.nodes & self.clock_mask == 0
+                && (Instant::now() >= self.deadline || self.stop.load(Ordering::Relaxed)))
+        {
             self.stopped = true;
         }
         self.stopped
@@ -200,6 +282,9 @@ impl Searcher<'_> {
     }
 
     fn negamax(&mut self, board: &Board, mut depth: i32, ply: usize, mut alpha: i32, beta: i32) -> i32 {
+        if self.stopped {
+            return 0;
+        }
         self.nodes += 1;
         if self.out_of_time() {
             return 0;
@@ -223,7 +308,7 @@ impl Searcher<'_> {
             return self.quiescence(board, ply, alpha, beta);
         }
 
-        let slot = (hash as usize) & (TT_SIZE - 1);
+        let slot = (hash as usize) & (self.tt.len() - 1);
         let entry = self.tt[slot];
         let tt_move = (entry.key == hash).then_some(entry.best).flatten();
         if ply > 0 && entry.key == hash && i32::from(entry.depth) >= depth {
@@ -291,6 +376,9 @@ impl Searcher<'_> {
     }
 
     fn quiescence(&mut self, board: &Board, ply: usize, mut alpha: i32, beta: i32) -> i32 {
+        if self.stopped {
+            return 0;
+        }
         self.nodes += 1;
         if self.out_of_time() {
             return 0;
@@ -340,7 +428,7 @@ impl Searcher<'_> {
         let mut seen = Vec::new();
         while line.len() < 12 {
             let hash = b.hash();
-            let entry = self.tt[(hash as usize) & (TT_SIZE - 1)];
+            let entry = self.tt[(hash as usize) & (self.tt.len() - 1)];
             let Some(mv) = entry.best.filter(|_| entry.key == hash) else { break };
             if seen.contains(&hash) || !b.is_legal(mv) {
                 break;
@@ -494,6 +582,29 @@ pub fn evaluate(board: &Board) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn screening_probe_never_reports_an_interrupted_iteration() {
+        let stop = AtomicBool::new(false);
+        let result = probe(&Board::default(), 1, Duration::from_secs(5), 4, &stop);
+        assert_eq!(result.nodes, 1);
+        assert!(result.iterations.is_empty());
+        assert!(result.budget_exhausted);
+        assert!(!result.complete);
+        let result = probe(&Board::default(), 5000, Duration::from_secs(5), 8, &stop);
+        assert!(result.nodes <= 5000);
+        assert!(result.budget_exhausted);
+        assert!(!result.complete);
+        assert!(!result.iterations.is_empty());
+        for info in result.iterations {
+            assert!(info.nodes < result.nodes);
+            assert!(crate::chess::replay(&Board::default(), &[&info.pv_uci[0]]).is_ok());
+        }
+        stop.store(true, Ordering::Relaxed);
+        let cancelled = probe(&Board::default(), 5000, Duration::from_secs(5), 4, &stop);
+        assert_eq!(cancelled.nodes, 0);
+        assert!(cancelled.iterations.is_empty());
+    }
 
     fn run(fen: &str, millis: u64) -> SearchInfo {
         let board = Board::from_fen(fen, false).unwrap();

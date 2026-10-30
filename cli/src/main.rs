@@ -70,6 +70,28 @@ enum Command {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Get a bounded second-engine opinion on every solver move. Does not change ratings
+    /// or hide puzzles. JSON output is one record per puzzle, with summary on stderr.
+    Review {
+        id: Option<String>,
+        #[command(flatten)]
+        filter: FilterArgs,
+        #[arg(short, default_value_t = 100)]
+        n: usize,
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Maximum completed depth per solver turn (check/quiescence extensions can go deeper).
+        #[arg(long, default_value_t = 4, value_parser = clap::value_parser!(u32).range(1..=12))]
+        depth: u32,
+        /// Total node budget per puzzle, shared across all solver turns.
+        #[arg(long, default_value_t = 50_000, value_parser = clap::value_parser!(u64).range(1..=1_000_000))]
+        nodes: u64,
+        /// Soft time budget for the whole puzzle, including search setup.
+        #[arg(long, default_value_t = 75, value_parser = clap::value_parser!(u64).range(1..=2000))]
+        millis: u64,
+        #[arg(long)]
+        json: bool,
+    },
     /// Show one puzzle with its solution in SAN.
     Show { id: String },
     /// Matching puzzles per theme.
@@ -308,6 +330,26 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
             );
             Ok(())
         }
+        Command::Review { id, filter: args, n, seed, depth, nodes, millis, json } => {
+            let store = open(&store_path)?;
+            let indices = match id {
+                Some(id) => vec![store.find(&id).ok_or_else(|| format!("no puzzle `{id}`"))?],
+                None => {
+                    let compiled = args.filter().compile(&store).map_err(|e| e.to_string())?;
+                    let seed = seed.unwrap_or_else(|| {
+                        SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_nanos() as u64)
+                    });
+                    filter::sample(&store, &compiled, n, seed)
+                }
+            };
+            review(
+                &store,
+                &indices,
+                data_dir,
+                lichess_puzzles_core::review::ReviewLimits { depth, nodes, millis },
+                json,
+            )
+        }
         Command::Show { id } => {
             let store = open(&store_path)?;
             let started = Instant::now();
@@ -374,6 +416,78 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+fn review(
+    store: &Store,
+    indices: &[usize],
+    data_dir: &Path,
+    limits: lichess_puzzles_core::review::ReviewLimits,
+    json: bool,
+) -> Result<(), String> {
+    use lichess_puzzles_core::review::{ReviewCache, ReviewStatus};
+    let cache = ReviewCache::open(&data_dir.join("engine-review.sqlite"))?;
+    let started = Instant::now();
+    let (mut agreement, mut different, mut inconclusive, mut hits, mut complete) = (0, 0, 0, 0, 0);
+    for &index in indices {
+        let lookup_started = Instant::now();
+        let puzzle = store.puzzle(index).map_err(|e| e.to_string())?;
+        let lookup_ms = lookup_started.elapsed().as_secs_f64() * 1000.0;
+        let review_started = Instant::now();
+        let (result, cached) = cache.inspect(&puzzle, limits)?;
+        let review_ms = review_started.elapsed().as_secs_f64() * 1000.0;
+        match result.status {
+            ReviewStatus::Agreement => agreement += 1,
+            ReviewStatus::DifferentMove => different += 1,
+            ReviewStatus::Inconclusive => inconclusive += 1,
+        }
+        hits += usize::from(cached);
+        complete += usize::from(result.complete);
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "id": puzzle.id, "rating": puzzle.rating, "rating_deviation": puzzle.deviation,
+                    "plays": puzzle.plays, "themes": puzzle.themes, "cached": cached, "review": result,
+                "lookup_ms": lookup_ms, "review_ms": review_ms,
+                })
+            );
+        } else {
+            println!(
+                "{} rating={} {:?} complete={} solver_turns={} nodes={} search_ms={:.2} cached={}",
+                puzzle.id,
+                puzzle.rating,
+                result.status,
+                result.complete,
+                result.moves.len(),
+                result.nodes,
+                result.elapsed_ms,
+                cached
+            );
+            for mv in result.moves {
+                let details: Vec<_> =
+                    mv.iterations.iter().map(|i| format!("d{}:{}:{:?}", i.depth, i.best_move, i.agreement)).collect();
+                println!(
+                    "  ply {} expected={} stable_from={:?} {}",
+                    mv.ply,
+                    mv.expected_move,
+                    mv.stable_from_depth,
+                    details.join(" ")
+                );
+            }
+        }
+    }
+    eprintln!(
+        "{} reviewed: agreement={}, different_move={}, inconclusive={}, complete={}, cache_hits={}, elapsed_ms={:.1}. Engine agreement is not a human difficulty rating; a different move is not proof of a bad puzzle.",
+        indices.len(),
+        agreement,
+        different,
+        inconclusive,
+        complete,
+        hits,
+        started.elapsed().as_secs_f64() * 1000.0
+    );
+    Ok(())
 }
 
 fn analyse(store: &Store, indices: &[usize], millis: u64) -> Result<(), String> {

@@ -117,6 +117,8 @@
                         <x:String>Exclude mate in one or two</x:String>
                     </RadioButtons>
                     <TextBlock Text="Checks the position before showing it. Short mates can still be difficult; choose the exclusions you want. The original database is kept." Style="{StaticResource JupiterCaptionTextStyle}" />
+                    <CheckBox Content="Skip shallow engine solutions" IsChecked="{x:Bind ViewModel.SkipShallowSolutions, Mode=TwoWay}" />
+                    <TextBlock Text="Experimental. Skips puzzles when the small engine consistently finds every solution move at shallow depths. This is not a human difficulty rating." Style="{StaticResource JupiterCaptionTextStyle}" />
                     <TextBlock Text="Filter counts are before screening and rating matching." Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                 </StackPanel>
 

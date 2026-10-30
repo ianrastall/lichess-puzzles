@@ -29,6 +29,8 @@ Filters apply as they change and can be saved as presets. **Next puzzle** (Ctrl+
 
 The original CSV, puzzle store and puzzle ratings are not edited by screening. Its reusable results live in `screening.sqlite` beside the player database, keyed by the full solver position and algorithm version. The file can be removed while the app is closed to rebuild the cache. Directly opening a puzzle by ID and exporting filtered puzzles still use the full database without applying this presentation-only screening.
 
+**Skip shallow engine solutions** adds an optional second opinion from the app's small Rust engine. It searches each solver turn independently, then skips only complete reviews that consistently agree with every recorded solver move across all observed depths (at least two per turn). Different recommendations and incomplete reviews remain available. This experimental search-effort filter is off by default and saved with presets; it does not assign a human difficulty rating. Its disposable cache is `engine-review.sqlite`. See [engine review](docs/engine-review.md) for limits, measurements and interpretation.
+
 Each player has a Glicko-2 puzzle rating starting at 1500 ± 350; a `?` marks it provisional while the deviation is above 110. With **Rated** on, your first attempt at a puzzle is a game against it, using its rating and deviation from the database. The first wrong move, hint or solution makes it a loss, and a solve without them a win. Leaving a puzzle after playing in it counts as a loss. Replays are not rated. **History** lists every attempt.
 
 This is a local rating based on your selected puzzles, not a Lichess account rating or over-the-board rating. Short-mate detection describes a position, not its human difficulty; a short mate can still be challenging. Screening and background preparation never count as attempts.
@@ -49,6 +51,8 @@ lichess-puzzles status              describe the store
 lichess-puzzles count [filter]      count matching puzzles
 lichess-puzzles sample [filter] -n 10 [--seed N]
 lichess-puzzles screen [filter] -n 100 [--seed N]
+lichess-puzzles review [id] [filter] -n 100 [--seed N] [--json]
+                                    review every solver turn with the small engine; does not change selection or ratings
 lichess-puzzles show <puzzle-id>    one puzzle with its solution in SAN
 lichess-puzzles themes [filter]     matching puzzles per theme
 lichess-puzzles openings [filter]   matching puzzles per opening family

@@ -131,22 +131,23 @@ public sealed partial class PuzzleViewModel : ObservableObject
         var offset = filter.DifficultyOffset;
         var window = filter.RatingWindow;
         var screening = filter.ExcludeShortMates;
+        var shallow = filter.SkipShallowSolutions;
         var previous = _serial;
-        SelectionText = screening > 0 ? "Checking the next puzzle…" : "";
-        await Run(core => core.NextPuzzle(near, offset, window, screening), result => Start(result.View), "A puzzle could not be opened");
+        SelectionText = screening > 0 || shallow ? "Checking the next puzzle…" : "";
+        await Run(core => core.NextPuzzle(near, offset, window, screening, shallow), result => Start(result.View), "A puzzle could not be opened");
         SelectionText = "";
         Recorded?.Invoke();
-        if (screening > 0 && _serial != previous && (_preparing is null || _preparing.IsCompleted))
+        if ((screening > 0 || shallow) && _serial != previous && (_preparing is null || _preparing.IsCompleted))
         {
-            _preparing = PrepareAsync(near, offset, window, screening);
+            _preparing = PrepareAsync(near, offset, window, screening, shallow);
         }
     }
 
-    private async Task PrepareAsync(bool near, int offset, int window, int screening)
+    private async Task PrepareAsync(bool near, int offset, int window, int screening, bool shallow)
     {
         try
         {
-            await _host.Run(core => { core.PrepareNext(near, offset, window, screening); return true; });
+            await _host.Run(core => { core.PrepareNext(near, offset, window, screening, shallow); return true; });
         }
         catch (Exception e) when (e is PuzzleCoreException or ObjectDisposedException)
         {

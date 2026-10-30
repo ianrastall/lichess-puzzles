@@ -296,17 +296,11 @@ pub fn pick(store: &Store, filter: &CompiledFilter, seed: u64) -> Option<usize> 
     None
 }
 
-/// A matching puzzle rated within 75 points of `target`, widening the window step by step when
-/// none is that close. Returns the puzzle and the window used.
+/// A matching puzzle within 150 points of `target`. Never broadens the range automatically.
 pub fn pick_near(store: &Store, filter: &CompiledFilter, target: i32, seed: u64) -> Option<(usize, u16)> {
-    for window in [75, 150, 300, 600, 1200, 4000] {
-        let low = (target - window).clamp(0, u16::MAX as i32) as u16;
-        let high = (target + window).clamp(0, u16::MAX as i32) as u16;
-        if let Some(index) = pick(store, &filter.within_ratings(low, high), seed) {
-            return Some((index, window as u16));
-        }
-    }
-    None
+    let low = target.saturating_sub(150).clamp(0, u16::MAX as i32) as u16;
+    let high = target.saturating_add(150).clamp(0, u16::MAX as i32) as u16;
+    pick(store, &filter.within_ratings(low, high), seed).map(|i| (i, 150))
 }
 
 /// Up to `n` distinct matching puzzles chosen at random from `seed`.

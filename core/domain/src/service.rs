@@ -10,6 +10,8 @@
 //! Players, ratings, history, export and analysis are in `service/practice.rs`.
 
 mod practice;
+mod selection;
+pub use selection::SelectionOptions;
 
 pub use practice::{AnalysisOutcome, AnalysisSnapshot, ExportSource, PlayersInfo, SessionResult};
 
@@ -49,6 +51,7 @@ pub enum ServiceError {
     Busy,
     NotFound(String),
     NoMatches,
+    Selection(String),
     Filter(FilterError),
     Session(SessionError),
     Store(StoreError),
@@ -63,6 +66,7 @@ impl std::fmt::Display for ServiceError {
             ServiceError::Busy => f.write_str("another download or build is running"),
             ServiceError::NotFound(id) => write!(f, "no puzzle `{id}` in this database"),
             ServiceError::NoMatches => f.write_str("no puzzles match the filters"),
+            ServiceError::Selection(message) => f.write_str(message),
             ServiceError::Filter(e) => e.fmt(f),
             ServiceError::Session(e) => e.fmt(f),
             ServiceError::Store(e) => e.fmt(f),
@@ -231,6 +235,7 @@ struct Inner {
     players: Mutex<PlayerStore>,
     /// The current player's played puzzles as record indices of the open store.
     played: Mutex<Option<(i64, Arc<Vec<u64>>)>>,
+    selection: Mutex<selection::SelectionState>,
     rated: AtomicBool,
     analysis: Mutex<practice::AnalysisState>,
     operation: Mutex<Option<Operation>>,
@@ -263,6 +268,7 @@ impl Service {
             session: Mutex::new(None),
             players: Mutex::new(players),
             played: Mutex::new(None),
+            selection: Mutex::new(selection::SelectionState::default()),
             rated: AtomicBool::new(true),
             analysis: Mutex::new(practice::AnalysisState::default()),
             operation: Mutex::new(None),

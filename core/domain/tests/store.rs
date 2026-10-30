@@ -117,10 +117,9 @@ fn filters_count_match_and_sample() {
     assert_eq!(store.id(filter::pick(&store, &unplayed_mates, 3).unwrap()), "00sHx");
     assert_eq!(filter::count(&store, &all.clone().excluding(played)), 12);
     let (near, window) = filter::pick_near(&store, &all, 1000, 9).unwrap();
-    assert_eq!((store.id(near).as_str(), window), ("00sO1", 75), "998 is the only rating within 75 of 1000");
-    let (far, window) = filter::pick_near(&store, &all, 3500, 9).unwrap();
-    assert_eq!(window, 1200, "nothing is within 600 of 3500");
-    assert!(store.record(far).rating >= 2300);
+    assert!((850..=1150).contains(&store.record(near).rating));
+    assert_eq!(window, 150);
+    assert!(filter::pick_near(&store, &all, 3500, 9).is_none(), "never silently widens");
 
     let none = Filter { rating_min: Some(4000), ..Default::default() }.compile(&store).unwrap();
     assert_eq!(filter::pick(&store, &none, 1), None);

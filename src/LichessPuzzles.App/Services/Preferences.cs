@@ -64,9 +64,11 @@ public sealed class FilterState
     public int? LengthMin { get; set; }
     public int? LengthMax { get; set; }
     /// <summary>Choose puzzles near the current player's rating plus <see cref="DifficultyOffset"/>.</summary>
-    public bool NearRating { get; set; }
+    public bool NearRating { get; set; } = true;
+    public int RatingWindow { get; set; } = 150;
+    public int ExcludeShortMates { get; set; }
     public int DifficultyOffset { get; set; }
-    public bool SkipPlayed { get; set; }
+    public bool SkipPlayed { get; set; } = true;
 
     public FilterState Copy() => JsonSerializer.Deserialize(JsonSerializer.Serialize(this, PreferencesJson.Default.FilterState), PreferencesJson.Default.FilterState)!;
 }

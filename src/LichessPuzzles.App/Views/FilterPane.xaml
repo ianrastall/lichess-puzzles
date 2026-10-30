@@ -100,9 +100,24 @@
                     <StackPanel Spacing="4" Visibility="{x:Bind Shown(ViewModel.IsNearRating), Mode=OneWay}">
                         <controls:NumericTextBox Header="Difficulty offset, −600 to 600" Value="{x:Bind ViewModel.DifficultyOffset, Mode=TwoWay}"
                                    Minimum="-600" Maximum="600" />
+                        <RadioButtons Header="Rating range" SelectedIndex="{x:Bind ViewModel.RatingWindowIndex, Mode=TwoWay}" MaxColumns="3">
+                            <x:String>±75</x:String>
+                            <x:String>±150</x:String>
+                            <x:String>±300</x:String>
+                        </RadioButtons>
                         <TextBlock Text="{x:Bind ViewModel.TargetText, Mode=OneWay}" Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                     </StackPanel>
                     <CheckBox Content="Skip puzzles this player has played" IsChecked="{x:Bind ViewModel.SkipPlayed, Mode=TwoWay}" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <RadioButtons Header="Short-mate screening" SelectedIndex="{x:Bind ViewModel.ScreeningIndex, Mode=TwoWay}" MaxColumns="1">
+                        <x:String>Off</x:String>
+                        <x:String>Exclude mate in one</x:String>
+                        <x:String>Exclude mate in one or two</x:String>
+                    </RadioButtons>
+                    <TextBlock Text="Checks the position before showing it. Short mates can still be difficult; choose the exclusions you want. The original database is kept." Style="{StaticResource JupiterCaptionTextStyle}" />
+                    <TextBlock Text="Filter counts are before screening and rating matching." Style="{StaticResource JupiterQuietCaptionTextStyle}" />
                 </StackPanel>
 
                 <!-- Themes -->

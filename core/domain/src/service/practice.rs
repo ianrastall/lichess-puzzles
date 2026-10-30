@@ -22,7 +22,7 @@ use crate::store::Store;
 
 /// The open session and what it means for the player's rating and history.
 pub(super) struct Active {
-    session: Session,
+    pub(super) session: Session,
     tracker: Tracker,
 }
 
@@ -103,7 +103,7 @@ fn player_error(e: PlayerError) -> ServiceError {
 
 impl Service {
     /// The current filter compiled for `store`, leaving out played puzzles when asked to.
-    fn compiled(&self, store: &Store) -> Result<CompiledFilter, ServiceError> {
+    pub(super) fn compiled(&self, store: &Store) -> Result<CompiledFilter, ServiceError> {
         let filter = self.inner.filter.lock().unwrap().clone();
         let compiled = filter.compile(store).map_err(ServiceError::Filter)?;
         Ok(if self.inner.skip_played.load(Ordering::Relaxed) {
@@ -114,7 +114,7 @@ impl Service {
     }
 
     /// The current player's played puzzles as record indices, cached until they change.
-    fn played_set(&self, store: &Store) -> Result<Arc<Vec<u64>>, ServiceError> {
+    pub(super) fn played_set(&self, store: &Store) -> Result<Arc<Vec<u64>>, ServiceError> {
         let players = self.inner.players.lock().unwrap();
         let player = players.current().map_err(player_error)?.id;
         let mut cache = self.inner.played.lock().unwrap();
@@ -142,20 +142,9 @@ impl Service {
         Ok(counts)
     }
 
-    /// Starts a random puzzle matching the current filter. With `near_offset`, the puzzle is
-    /// rated near the current player's rating plus the offset.
+    /// Starts a random puzzle, within 150 points when near-rating selection is requested.
     pub fn next_puzzle(&self, near_offset: Option<i32>) -> Result<SessionResult, ServiceError> {
-        let store = self.store()?;
-        let compiled = self.compiled(&store)?;
-        let seed = self.inner.seed.fetch_add(0x9E37_79B9_7F4A_7C15, Ordering::Relaxed);
-        let index = match near_offset {
-            Some(offset) => {
-                let rating = self.inner.players.lock().unwrap().current().map_err(player_error)?.rating.rating;
-                filter::pick_near(&store, &compiled, rating.round() as i32 + offset, seed).map(|(i, _)| i)
-            }
-            None => filter::pick(&store, &compiled, seed),
-        };
-        self.start_session(&store, index.ok_or(ServiceError::NoMatches)?, false)
+        self.next_selected(near_offset, super::SelectionOptions::default())
     }
 
     /// Starts a puzzle by id or lichess.org training link.
@@ -166,7 +155,12 @@ impl Service {
         self.start_session(&store, index, replay)
     }
 
-    fn start_session(&self, store: &Store, index: usize, replay: bool) -> Result<SessionResult, ServiceError> {
+    pub(super) fn start_session(
+        &self,
+        store: &Store,
+        index: usize,
+        replay: bool,
+    ) -> Result<SessionResult, ServiceError> {
         let puzzle = store.puzzle(index).map_err(ServiceError::Store)?;
         let mut guard = self.inner.session.lock().unwrap();
         if let Some(previous) = guard.as_mut() {

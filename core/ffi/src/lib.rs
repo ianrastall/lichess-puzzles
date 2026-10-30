@@ -69,6 +69,7 @@ fn service_error(request_id: u64, e: ServiceError) -> messages::Response {
         ServiceError::Busy => ErrorKind::Busy,
         ServiceError::NotFound(_) => ErrorKind::NotFound,
         ServiceError::NoMatches => ErrorKind::NoMatches,
+        ServiceError::Selection(_) => ErrorKind::Selection,
         ServiceError::Filter(_) => ErrorKind::InvalidFilter,
         ServiceError::Session(_) => ErrorKind::State,
         ServiceError::Store(_) | ServiceError::Io(_) => ErrorKind::Io,
@@ -123,7 +124,14 @@ pub fn dispatch(service: &Service, req: messages::Request) -> messages::Response
                 Err(e) => service_error(id, e),
             }
         }
-        Some(C::NextPuzzle(n)) => session(service.next_puzzle(n.near_rating.then_some(n.offset))),
+        Some(C::NextPuzzle(n)) => session(service.next_selected(
+            n.near_rating.then_some(n.offset),
+            lichess_puzzles_core::service::SelectionOptions::new(n.rating_window, n.exclude_short_mates),
+        )),
+        Some(C::PrepareNext(n)) => finish(service.prepare_next(
+            n.near_rating.then_some(n.offset),
+            lichess_puzzles_core::service::SelectionOptions::new(n.rating_window, n.exclude_short_mates),
+        )),
         Some(C::LoadPuzzle(p)) => session(service.load_puzzle(&p.id, p.replay)),
         Some(C::Session(s)) => {
             let command = match s.command {

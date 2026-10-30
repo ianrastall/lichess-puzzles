@@ -126,6 +126,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Button Content="Hint" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.HintCommand}"
                         IsEnabled="{x:Bind ViewModel.CanHint, Mode=OneWay}" ToolTipService.ToolTip="Highlight the piece to move (Ctrl+H)" />
@@ -136,6 +137,8 @@
                 <Button x:Name="NextButton" Grid.Row="1" Grid.Column="1" Content="Next puzzle" HorizontalAlignment="Stretch"
                         Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.NextCommand}"
                         IsEnabled="{x:Bind ViewModel.CanNext, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind ViewModel.NextTooltip, Mode=OneWay}" />
+                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{x:Bind ViewModel.SelectionText, Mode=OneWay}"
+                           Style="{StaticResource JupiterCaptionTextStyle}" />
             </Grid>
 
             <!-- Player -->

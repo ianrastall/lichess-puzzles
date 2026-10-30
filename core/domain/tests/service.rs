@@ -247,7 +247,7 @@ fn ratings_history_and_played_puzzles() {
     assert_eq!(service.set_filter(Filter::default(), true).unwrap().total, 13);
     assert!(service.history(10).unwrap().is_empty());
     let near = service.next_puzzle(Some(-500)).unwrap();
-    assert_eq!(near.view.puzzle.id, "00sO1", "998 is the only rating near 1000");
+    assert!((850..=1150).contains(&near.view.puzzle.rating), "respects the explicit default ±150 range");
     let info = service.players(0).unwrap();
     assert_eq!(info.current, guest.id);
     assert_eq!(info.stats.played, 0);
@@ -397,4 +397,76 @@ fn exports_and_analysis() {
     assert_eq!(info.score, Score::Mate(-1), "{info:?}");
     assert_eq!(info.pv_san[0], "Qg2#");
     assert!(service.start_analysis("not a fen", Duration::from_secs(1)).is_err());
+}
+
+#[test]
+fn screening_is_personal_non_destructive_and_does_not_start_attempts() {
+    use lichess_puzzles_core::service::SelectionOptions;
+    let dir = tempfile::tempdir().unwrap();
+    let service = installed(dir.path());
+    let original_csv = std::fs::read(SAMPLE).unwrap();
+    let original_store = std::fs::read(dir.path().join("puzzles.store")).unwrap();
+    let before = service.players(0).unwrap();
+    service.load_puzzle("0000D", false).unwrap();
+    service.prepare_next(None, SelectionOptions::new(150, 2)).unwrap();
+    assert_eq!(service.session(SessionCommand::Get).unwrap().view.puzzle.id, "0000D");
+    assert_eq!(service.players(0).unwrap(), before, "prefetch does not rate or record anything");
+    assert!(service.history(100).unwrap().is_empty());
+
+    // A prepared non-mate must not leak through after changing to a mate-only filter.
+    service.set_filter(Filter { themes_any: vec!["mate".into()], ..Default::default() }, false).unwrap();
+    assert!(matches!(service.next_selected(None, SelectionOptions::new(150, 2)), Err(ServiceError::Selection(_))));
+    assert_eq!(
+        service.session(SessionCommand::Get).unwrap().view.puzzle.id,
+        "0000D",
+        "failed selection preserves the board"
+    );
+    assert_eq!(service.players(0).unwrap(), before);
+    // Exclude mate in one, but keep a genuine mate in two.
+    assert_eq!(service.next_selected(None, SelectionOptions::new(150, 1)).unwrap().view.puzzle.id, "00sHx");
+    let result = solve(&service);
+    assert!(result.rating_change.is_some());
+    assert_eq!(service.players(0).unwrap().players[0].games, 1);
+    // Screening off restores access to the full source, including excluded puzzles.
+    service.set_filter(Filter { themes_any: vec!["mateIn1".into()], ..Default::default() }, false).unwrap();
+    assert_eq!(service.next_selected(None, SelectionOptions::default()).unwrap().view.puzzle.id, "0000H");
+    assert_eq!(std::fs::read(SAMPLE).unwrap(), original_csv);
+    assert_eq!(std::fs::read(dir.path().join("puzzles.store")).unwrap(), original_store);
+    assert!(dir.path().join("screening.sqlite").exists());
+}
+
+#[test]
+fn selection_stays_in_the_requested_rating_range() {
+    use lichess_puzzles_core::service::SelectionOptions;
+    let dir = tempfile::tempdir().unwrap();
+    let service = installed(dir.path());
+    service.set_filter(Filter { rating_min: Some(2200), ..Default::default() }, true).unwrap();
+    let error = service.next_selected(Some(0), SelectionOptions::new(75, 0)).unwrap_err();
+    assert!(matches!(error, ServiceError::Selection(_)));
+    assert!(error.to_string().contains("±75"));
+    assert!(service.history(100).unwrap().is_empty());
+    // Explicitly broaden via the caller's offset and window; never as an automatic fallback.
+    let result = service.next_selected(Some(600), SelectionOptions::new(150, 2)).unwrap();
+    assert_eq!(result.view.puzzle.rating, 2235);
+    assert!(service.history(100).unwrap().is_empty(), "opening a puzzle is not a solve");
+}
+
+#[test]
+fn screening_proves_mates_even_without_mate_tags() {
+    use lichess_puzzles_core::service::SelectionOptions;
+    let dir = tempfile::tempdir().unwrap();
+    let csv = std::fs::read_to_string(SAMPLE).unwrap();
+    let row = csv
+        .lines()
+        .find(|l| l.starts_with("0000H,"))
+        .unwrap()
+        .replace("mate mateIn1 middlegame oneMove", "advantage middlegame");
+    let input = dir.path().join("untagged.csv");
+    std::fs::write(&input, format!("{}\n{row}\n", csv.lines().next().unwrap())).unwrap();
+    let service = open(dir.path(), "http://127.0.0.1:9/unused");
+    service.start_build(Some(input.clone()), true).unwrap();
+    settle(&service);
+    assert!(matches!(service.next_selected(None, SelectionOptions::new(150, 1)), Err(ServiceError::Selection(_))));
+    assert_eq!(service.next_puzzle(None).unwrap().view.puzzle.id, "0000H");
+    assert_eq!(std::fs::read_to_string(input).unwrap().lines().nth(1).unwrap(), row);
 }

@@ -10,6 +10,7 @@ public enum PuzzleErrorKind
     Busy,
     NotFound,
     NoMatches,
+    Selection,
     InvalidFilter,
     State,
     Io,
@@ -28,6 +29,7 @@ public sealed class PuzzleCoreException(PuzzleErrorKind kind, string message) : 
             ErrorKind.Busy => PuzzleErrorKind.Busy,
             ErrorKind.NotFound => PuzzleErrorKind.NotFound,
             ErrorKind.NoMatches => PuzzleErrorKind.NoMatches,
+            ErrorKind.Selection => PuzzleErrorKind.Selection,
             ErrorKind.InvalidFilter => PuzzleErrorKind.InvalidFilter,
             ErrorKind.State => PuzzleErrorKind.State,
             ErrorKind.Io => PuzzleErrorKind.Io,
@@ -130,8 +132,17 @@ public sealed class PuzzleCore : IDisposable
         Call(new Request { SetFilter = new SetFilter { Filter = filter, SkipPlayed = skipPlayed } }).Counts;
 
     /// <summary>Starts a random puzzle matching the current filter, optionally near the player's rating plus an offset.</summary>
-    public SessionResult NextPuzzle(bool nearRating = false, int offset = 0) =>
-        Call(new Request { NextPuzzle = new NextPuzzle { NearRating = nearRating, Offset = offset } }).Session;
+    public SessionResult NextPuzzle(bool nearRating = false, int offset = 0, int ratingWindow = 150, int excludeShortMates = 0) =>
+        Call(new Request { NextPuzzle = Selection(nearRating, offset, ratingWindow, excludeShortMates) }).Session;
+
+    public void PrepareNext(bool nearRating, int offset, int ratingWindow, int excludeShortMates) =>
+        Call(new Request { PrepareNext = Selection(nearRating, offset, ratingWindow, excludeShortMates) });
+
+    private static NextPuzzle Selection(bool near, int offset, int window, int mates) => new()
+    {
+        NearRating = near, Offset = offset, RatingWindow = (uint)Math.Clamp(window, 1, 600),
+        ExcludeShortMates = (uint)Math.Clamp(mates, 0, 2),
+    };
 
     /// <summary>Starts a puzzle by id or lichess.org training link.</summary>
     public SessionResult LoadPuzzle(string id, bool replay = false) =>

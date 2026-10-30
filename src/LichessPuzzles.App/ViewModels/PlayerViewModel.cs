@@ -18,6 +18,7 @@ public sealed partial class PlayerViewModel(CoreHost host, JsonStore<AppSettings
 
     [ObservableProperty] public partial string Name { get; set; } = "";
     [ObservableProperty] public partial string RatingText { get; set; } = "";
+    [ObservableProperty] public partial string RatingStatus { get; set; } = "";
     [ObservableProperty] public partial string RatingTooltip { get; set; } = "";
     [ObservableProperty] public partial string ChangeText { get; set; } = "";
     [ObservableProperty] public partial string ChangeName { get; set; } = "";
@@ -61,8 +62,9 @@ public sealed partial class PlayerViewModel(CoreHost host, JsonStore<AppSettings
         {
             Name = p.Name;
             RatingText = $"{Format.Count((long)Math.Round(p.Rating))}{(p.Provisional ? "?" : "")}";
-            RatingTooltip = $"Rating {p.Rating:0} ± {p.Deviation:0}" + (p.Provisional ? ", provisional while the deviation is above 110" : "")
-                + $" · {Format.Count(p.Games)} rated puzzles, {Format.Count(p.Wins)} solved";
+            RatingStatus = $"{(p.Provisional ? "Provisional" : "Established")} · rating deviation {p.Deviation:0} · {Format.Count(p.Games)} rated puzzles";
+            RatingTooltip = $"Local puzzle rating {p.Rating:0} (Glicko-2 deviation {p.Deviation:0})" + (p.Provisional ? ", provisional while the deviation is above 110" : "")
+                + $" · {Format.Count(p.Games)} rated puzzles, {Format.Count(p.Wins)} solved. Based on this player’s selected puzzles; not a Lichess account or over-the-board rating.";
         }
         var s = list.Stats;
         TodayText = s.TodayPlayed == 0

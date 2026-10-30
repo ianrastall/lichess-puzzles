@@ -181,6 +181,17 @@ public sealed partial class FilterViewModel : ObservableObject
     [ObservableProperty]
     public partial bool SkipPlayed { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TargetText))]
+    public partial int RatingWindowIndex { get; set; } = 1;
+
+    [ObservableProperty]
+    public partial int ScreeningIndex { get; set; }
+
+    private int RatingWindow => RatingWindowIndex switch { 0 => 75, 2 => 300, _ => 150 };
+    partial void OnRatingWindowIndexChanged(int value) => Changed();
+    partial void OnScreeningIndexChanged(int value) => Changed();
+
     public bool IsNearRating => ChooseIndex == 1;
 
     /// <summary>The current player's rating, for the target shown with "Near my rating".</summary>
@@ -188,7 +199,7 @@ public sealed partial class FilterViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(TargetText))]
     public partial double PlayerRating { get; set; } = 1500;
 
-    public string TargetText => $"Target {Format.Count((long)Math.Round(PlayerRating + (double.IsNaN(DifficultyOffset) ? 0 : DifficultyOffset)))} ± 75, widening when nothing is that close. The other filters still apply.";
+    public string TargetText => $"Target {Format.Count((long)Math.Round(PlayerRating + (double.IsNaN(DifficultyOffset) ? 0 : DifficultyOffset)))} ± {RatingWindow}. The range stays fixed; other filters still apply.";
 
     /// <summary>Preset names, with an empty first entry for "no preset".</summary>
     public ObservableCollection<string> PresetNames { get; } = [];
@@ -356,6 +367,8 @@ public sealed partial class FilterViewModel : ObservableObject
         }
         ChooseIndex = saved.NearRating ? 1 : 0;
         DifficultyOffset = saved.DifficultyOffset;
+        RatingWindowIndex = saved.RatingWindow switch { 75 => 0, 300 => 2, _ => 1 };
+        ScreeningIndex = Math.Clamp(saved.ExcludeShortMates, 0, 2);
         SkipPlayed = saved.SkipPlayed;
     }
 
@@ -444,9 +457,11 @@ public sealed partial class FilterViewModel : ObservableObject
             row.State = ThemeState.NotUsed;
         }
         Openings.Clear();
-        ChooseIndex = 0;
+        ChooseIndex = 1;
         DifficultyOffset = 0;
-        SkipPlayed = false;
+        RatingWindowIndex = 1;
+        ScreeningIndex = 0;
+        SkipPlayed = true;
         SelectedPreset = null;
         _loading = false;
         Changed();
@@ -492,6 +507,8 @@ public sealed partial class FilterViewModel : ObservableObject
         f.NearRating = ChooseIndex == 1;
         f.DifficultyOffset = double.IsNaN(DifficultyOffset) ? 0 : (int)Math.Round(Math.Clamp(DifficultyOffset, -600, 600));
         f.SkipPlayed = SkipPlayed;
+        f.RatingWindow = RatingWindow;
+        f.ExcludeShortMates = Math.Clamp(ScreeningIndex, 0, 2);
         _settings.Save();
     }
 

@@ -57,6 +57,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
     private int _serial;
     private LastAction _last;
     private bool _busy;
+    private Task? _preparing;
     private bool _rated;
     private (double Before, double After)? _change;
 
@@ -103,6 +104,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
     [ObservableProperty] public partial bool CanShowSolution { get; set; }
     [ObservableProperty] public partial bool CanRetry { get; set; }
     [ObservableProperty] public partial bool CanNext { get; set; }
+    [ObservableProperty] public partial string SelectionText { get; set; } = "";
     [ObservableProperty] public partial string NextTooltip { get; set; } = "Next puzzle (Ctrl+N)";
     [ObservableProperty] public partial bool CanGoBack { get; set; }
     [ObservableProperty] public partial bool CanGoForward { get; set; }
@@ -127,8 +129,29 @@ public sealed partial class PuzzleViewModel : ObservableObject
         var filter = _settings.Value.Filter;
         var near = filter.NearRating;
         var offset = filter.DifficultyOffset;
-        await Run(core => core.NextPuzzle(near, offset), result => Start(result.View), "A puzzle could not be opened");
+        var window = filter.RatingWindow;
+        var screening = filter.ExcludeShortMates;
+        var previous = _serial;
+        SelectionText = screening > 0 ? "Checking the next puzzle…" : "";
+        await Run(core => core.NextPuzzle(near, offset, window, screening), result => Start(result.View), "A puzzle could not be opened");
+        SelectionText = "";
         Recorded?.Invoke();
+        if (screening > 0 && _serial != previous && (_preparing is null || _preparing.IsCompleted))
+        {
+            _preparing = PrepareAsync(near, offset, window, screening);
+        }
+    }
+
+    private async Task PrepareAsync(bool near, int offset, int window, int screening)
+    {
+        try
+        {
+            await _host.Run(core => { core.PrepareNext(near, offset, window, screening); return true; });
+        }
+        catch (Exception e) when (e is PuzzleCoreException or ObjectDisposedException)
+        {
+            // Preparation is optional. Next reports a failure if no candidate can be selected.
+        }
     }
 
     /// <summary>Opens a puzzle by id or link; a replay is neither rated nor recorded.</summary>
@@ -391,6 +414,7 @@ public sealed partial class PuzzleViewModel : ObservableObject
         try
         {
             _busy = true;
+            UpdateCommands();
             var result = await _host.Run(call);
             if (result is not null && serial == _serial)
             {
@@ -614,9 +638,9 @@ public sealed partial class PuzzleViewModel : ObservableObject
         var view = _view;
         var solvingAtLatest = view?.State == SessionState.Solving && view.View == view.Played;
         CanHint = solvingAtLatest && !_busy;
-        CanShowSolution = view is not null && !Finished;
-        CanRetry = view is not null;
-        CanNext = StoreAvailable && FilterHasMatches;
+        CanShowSolution = view is not null && !Finished && !_busy;
+        CanRetry = view is not null && !_busy;
+        CanNext = StoreAvailable && FilterHasMatches && !_busy;
         NextTooltip = !StoreAvailable ? "Available once puzzles are installed"
             : !FilterHasMatches ? "No puzzles match the filters"
             : "Next puzzle (Ctrl+N)";

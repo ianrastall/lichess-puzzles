@@ -61,6 +61,15 @@ enum Command {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Inspect a random sample for forced mate in one/two, without playing or changing ratings.
+    Screen {
+        #[command(flatten)]
+        filter: FilterArgs,
+        #[arg(short, default_value_t = 100)]
+        n: usize,
+        #[arg(long)]
+        seed: Option<u64>,
+    },
     /// Show one puzzle with its solution in SAN.
     Show { id: String },
     /// Matching puzzles per theme.
@@ -262,6 +271,41 @@ fn run(command: Command, data_dir: &Path) -> Result<(), String> {
                 println!("{:<6} {:>4}  {:<5}  {}", p.id, p.rating, format!("{:?}", p.solver), p.themes.join(" "));
             }
             eprintln!("({:.1} ms to choose)", elapsed.as_secs_f64() * 1000.0);
+            Ok(())
+        }
+        Command::Screen { filter: args, n, seed } => {
+            let store = open(&store_path)?;
+            let compiled = args.filter().compile(&store).map_err(|e| e.to_string())?;
+            let started = Instant::now();
+            let picked = filter::sample(&store, &compiled, n.min(10_000), seed.unwrap_or(42));
+            let cache = lichess_puzzles_core::screening::ScreeningCache::open(&data_dir.join("screening.sqlite"))
+                .map_err(|e| e.to_string())?;
+            let mut totals = [0usize; 4];
+            let mut hits = 0usize;
+            for &index in &picked {
+                let p = store.puzzle(index).map_err(|e| e.to_string())?;
+                let board = lichess_puzzles_core::screening::solver_board(&p).map_err(|e| e.to_string())?;
+                let (verdict, hit) = cache.inspect(&board).map_err(|e| e.to_string())?;
+                use lichess_puzzles_core::screening::Verdict;
+                totals[match verdict {
+                    Verdict::Mate(1) => 0,
+                    Verdict::Mate(_) => 1,
+                    Verdict::NoShortMate => 2,
+                    Verdict::Inconclusive => 3,
+                }] += 1;
+                hits += usize::from(hit);
+                println!("{} rating={} {:?} cached={}", p.id, p.rating, verdict, hit);
+            }
+            eprintln!(
+                "{} checked: mate1={}, mate2={}, no_short_mate={}, inconclusive={}, cache_hits={}, elapsed_ms={:.1}",
+                picked.len(),
+                totals[0],
+                totals[1],
+                totals[2],
+                totals[3],
+                hits,
+                started.elapsed().as_secs_f64() * 1000.0
+            );
             Ok(())
         }
         Command::Show { id } => {

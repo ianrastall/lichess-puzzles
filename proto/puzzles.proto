@@ -44,6 +44,8 @@ message Request {
     StartAnalysis start_analysis = 50;
     GetAnalysis get_analysis = 51;
     StopAnalysis stop_analysis = 52;
+    // Prepare a screened candidate without starting an attempt or changing ratings.
+    NextPuzzle prepare_next = 53;
   }
 }
 
@@ -56,9 +58,13 @@ message SetFilter {
 }
 // Starts a random puzzle matching the current filter.
 message NextPuzzle {
-  // Choose near the current player's rating plus offset, widening the window when needed.
+  // Choose near the current player's rating plus offset, never widening automatically.
   bool near_rating = 1;
   sint32 offset = 2;
+  // Explicit half-width; zero means 150, capped at 600.
+  uint32 rating_window = 3;
+  // 0 off, 1 exclude proven mate in one, 2 exclude proven mate in one/two.
+  uint32 exclude_short_mates = 4;
 }
 message LoadPuzzle {
   // Puzzle id or lichess.org training link.
@@ -261,6 +267,8 @@ enum ErrorKind {
   ERROR_KIND_UNKNOWN_COMMAND = 8;
   // An invalid or duplicate player name, the last player, or a player database error.
   ERROR_KIND_PLAYER = 9;
+  // No accepted candidate in this bounded screening batch; Next may be retried.
+  ERROR_KIND_SELECTION = 10;
 }
 
 message Error {

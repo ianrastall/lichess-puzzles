@@ -3,7 +3,7 @@ resolver = "3"
 members = ["core/domain", "core/ffi", "cli"]
 
 [workspace.package]
-version = "3.1.0"
+version = "3.2.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT"

@@ -138,8 +138,9 @@ try
         Check(guestNow.Games == 1 && guestNow.Provisional && guestNow.Rating < 1500, "rating stored");
         counts = core.SetFilter(new Filter { ThemesAny = { "mate" } }, skipPlayed: true);
         Check(counts.Total == 1, "played puzzles skipped");
-        result = core.NextPuzzle(nearRating: true, offset: 0);
-        Check(result.View.Puzzle.Id == "00sHx", "near-rating choice from the unplayed mate");
+        Expect(() => core.NextPuzzle(nearRating: true, offset: 0), PuzzleErrorKind.Selection, "an out-of-range mate is not silently selected");
+        result = core.NextPuzzle(nearRating: true, offset: (int)Math.Round(1760 - guestNow.Rating), ratingWindow: 75);
+        Check(result.View.Puzzle.Id == "00sHx", "explicit offset selects the unplayed mate");
         core.RenamePlayer(guest.Id, "Visitor");
         core.ClearHistory(guest.Id);
         Check(core.GetHistory().Count == 0, "history cleared");
@@ -176,6 +177,25 @@ try
             Check(terminal.HasResult && !terminal.Running && terminal.TerminalOutcome == expected && terminal.PvSan.Count == 0,
                 $"terminal evaluation: {expected}");
         }
+    }
+
+    using (var core = PuzzleCore.Create(Path.Combine(root, "screening"), "http://127.0.0.1:9/unused", "Screen tester"))
+    {
+        core.StartBuild(sample, true);
+        WaitForOperation(core);
+        core.LoadPuzzle("0000D");
+        core.PrepareNext(false, 0, 150, 2);
+        Check(core.GetSession().View.Puzzle.Id == "0000D", "preparation preserves the active puzzle");
+        Check(core.GetPlayers(DateTimeOffset.Now).Players[0].Games == 0 && core.GetHistory().Count == 0, "screening does not change ratings or history");
+        core.SetFilter(new Filter { ThemesAny = { "mate" } });
+        Expect(() => core.NextPuzzle(false, 0, 150, 2), PuzzleErrorKind.Selection, "cached candidate invalidated after filter change");
+        Check(core.GetSession().View.Puzzle.Id == "0000D", "failed screening preserves the active puzzle");
+        Check(core.NextPuzzle(false, 0, 150, 1).View.Puzzle.Id == "00sHx", "mate-in-one exclusion still allows mate in two across ABI");
+        core.SetFilter(new Filter { RatingMin = 2200 });
+        Expect(() => core.NextPuzzle(true, 0, 75, 0), PuzzleErrorKind.Selection, "near-rating search never silently widens");
+        core.SetFilter(new Filter { ThemesAny = { "mateIn1" } });
+        Check(core.NextPuzzle(false, 0, 150, 0).View.Puzzle.Id == "0000H", "screening off restores excluded source puzzles");
+        Check(File.Exists(Path.Combine(root, "screening", "screening.sqlite")), "screening cache is separate from source and history");
     }
 
     // A second core reopens the installed store.

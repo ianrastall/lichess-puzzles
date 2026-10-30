@@ -2,7 +2,7 @@
 
 A Windows desktop app for importing, filtering and playing the [Lichess puzzle database](https://database.lichess.org/#puzzles) offline. Part of the Jupiter family.
 
-Version 3.1.0 adds local database discovery and user-managed downloads to the Jupiter rebuild of Lichess Puzzle Desktop. The app imports, filters and plays puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer. See the [release notes](CHANGELOG.md) and [validation record](docs/release-3.1.0.md).
+Version 3.2.0 adds optional short-mate screening and fixed rating ranges. The app imports, filters and plays puzzles, with players and Glicko-2 ratings, history, presets, export, an evaluation engine and a per-user installer. Local database discovery and user-managed downloads remain available. See the [release notes](CHANGELOG.md) and [screening design and validation](docs/puzzle-selection.md).
 
 [Download the Windows installer](https://github.com/ianrastall/lichess-puzzles/releases/latest).
 
@@ -23,7 +23,17 @@ Download the puzzle database from [Lichess](https://database.lichess.org/#puzzle
 
 Filters apply as they change and can be saved as presets. **Next puzzle** (Ctrl+N) draws a matching puzzle at random or near your rating, optionally skipping puzzles you have played. **Help > Keyboard shortcuts** lists the keys. The window layout is described in [docs/workbench-layout.md](docs/workbench-layout.md).
 
+**Near my rating** keeps the target inside your chosen ±75, ±150 or ±300 range, with an optional difficulty offset. An empty selection asks you to change the range or filters; it never broadens them automatically. New settings default to near-rating selection at ±150 and skipping played puzzles; upgrades preserve saved choices.
+
+**Short-mate screening** can exclude proven mate in one, or mate in one or two. It checks the position the solver sees, including every legal defence, before opening it. Screening is off until you choose it, and is saved with filter presets. Counts in the filter pane are before screening and rating matching. The app prepares a candidate in the background and rechecks its eligibility before use. Searches have a budget; an unfinished check does not mean the puzzle is difficult. If a batch produces no accepted puzzle, Next can be retried or the selection changed.
+
+The original CSV, puzzle store and puzzle ratings are not edited by screening. Its reusable results live in `screening.sqlite` beside the player database, keyed by the full solver position and algorithm version. The file can be removed while the app is closed to rebuild the cache. Directly opening a puzzle by ID and exporting filtered puzzles still use the full database without applying this presentation-only screening.
+
 Each player has a Glicko-2 puzzle rating starting at 1500 ± 350; a `?` marks it provisional while the deviation is above 110. With **Rated** on, your first attempt at a puzzle is a game against it, using its rating and deviation from the database. The first wrong move, hint or solution makes it a loss, and a solve without them a win. Leaving a puzzle after playing in it counts as a loss. Replays are not rated. **History** lists every attempt.
+
+This is a local rating based on your selected puzzles, not a Lichess account rating or over-the-board rating. Short-mate detection describes a position, not its human difficulty; a short mate can still be challenging. Screening and background preparation never count as attempts.
+
+The **Player rating** section stays at the top of both Puzzle and History, with the current player, rating, provisional status, rating deviation and rated-puzzle count. If Next would abandon an attempt, matching uses the rating that its loss would produce. The loss is committed only when an eligible next puzzle is ready. Selection retries if player, filter, session or database state changes before the new session starts.
 
 **Evaluation** (off by default; **View** or **Settings**) runs a small built-in engine after the puzzle ends, or while solving if you choose. It shows a score, best line and an evaluation bar. It is a guide, not an authority.
 
@@ -38,6 +48,7 @@ lichess-puzzles build               build the puzzle store from the download, or
 lichess-puzzles status              describe the store
 lichess-puzzles count [filter]      count matching puzzles
 lichess-puzzles sample [filter] -n 10 [--seed N]
+lichess-puzzles screen [filter] -n 100 [--seed N]
 lichess-puzzles show <puzzle-id>    one puzzle with its solution in SAN
 lichess-puzzles themes [filter]     matching puzzles per theme
 lichess-puzzles openings [filter]   matching puzzles per opening family

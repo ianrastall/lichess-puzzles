@@ -20,9 +20,15 @@ Near-rating selection uses an explicit ±75, ±150 or ±300 band around the play
 
 Existing per-player Glicko-2 settlement remains: first wrong move/hint/solution is a loss; a clean solve is a win; only the first attempt counts. Preparing/rejecting a candidate changes no ratings/history. Personal filtering can narrow the skills represented by the local estimate. It is not an official Lichess account, FIDE or other playing-strength rating.
 
+Before selecting, the core forecasts any pending abandonment loss with the same Glicko-2 calculation used at settlement. It does not write that loss unless an eligible next puzzle can start. A shared state gate captures player/filter/played-history/session/store inputs coherently, while a revision counter invalidates work when any of them changes. Long scans and mate checks run outside the gate. Candidate success **and failure** are checked against the revision under the session-commit lock; stale work retries, up to five times. Store readers are dropped before acquiring the commit gate to avoid holding a mapped reader while store replacement waits for it. These changes address both Copilot findings on PR #2.
+
+The player summary is at the top of the inspector, above both tabs. The rating uses the shared section-heading style and is explicitly labeled Player rating; provisional status, Glicko-2 deviation and rated-puzzle count are visible below it.
+
 ## Validation
 
 Rust regressions cover exact mate-in-one/two recognition, a nonmate, stalemate, an exhausted budget, cache persistence and changed-position identity. Service tests prove untagged mates are screened, source/store bytes stay unchanged, rejected candidates don't change ratings/history or replace the active board, changed filters invalidate preparation, mate-in-one-only exclusion still allows mate in two, and near-rating selection respects its explicit bounds. Existing solve/rating/replay/export/import tests remain in the required suite.
+
+Four additional adversarial regressions exercise abandonment projection with failed-selection rollback, changing filters at the selection/commit boundary, switching to a differently rated player at that boundary, and replacing the store before commit without a mapped-reader deadlock. Candidate selection is retried against the changed state.
 
 The C# to native DLL checks exercise these same user-visible contracts over generated protobuf messages, including preparation, retryable selection errors and disabling screening. The normal installer build runs format, Clippy, Rust tests, native integration checks and the shared Jupiter style check.
 
@@ -30,11 +36,11 @@ Measured with the 6,157,341-puzzle installed store on 30 October 2026, release b
 
 Final delivery checks on 30 October 2026:
 
-- The normal `pwsh build/build.ps1` completed: format, Clippy with warnings denied, all 46 Rust tests, all 55 C# to native integration checks, Jupiter style validation, app/CLI publish, complete source ZIP and installer.
+- The screening preview passed the normal `pwsh build/build.ps1`: format, Clippy with warnings denied, all 46 Rust tests, all 55 C# to native integration checks, Jupiter style validation, app/CLI publish, complete source ZIP and installer. The review fixes add four Rust regressions, for a total of 50. Final release validation is recorded in `release-3.2.0.md`.
 - Installed 3.2.0 over the existing per-user installation with installer exit code 0. The installed executable reports 3.2.0.0 and its SHA256 matches the published executable. The existing Start Menu shortcut launches it by the application name.
 - Desktop verification used an isolated test data directory with a copy of the complete store, not Ian's profile. Fresh near-rating ±150/skip-played defaults, opt-in screening, a screened puzzle within range, saving a screening preset, restart persistence and both dark/light themes were inspected in the installed GUI. A Windows contrast theme was not manually exercised.
 - Ian's existing `players.sqlite`, `puzzles.store` and `settings.json` SHA256 values were unchanged after installation and verification. The isolated GUI checks created no rated attempts. Original source/store byte preservation is separately asserted by the service and integration regressions.
-- The source ZIP contains both new screening/selection modules and this design document, along with the existing exact Jupiter.UI source snapshot. No public release is implied by local installation; this work is prepared on `feature/puzzle-screening` for review.
+- The source ZIP contains both new screening/selection modules and this design document, along with the existing exact Jupiter.UI source snapshot. Publication follows final installer and desktop verification.
 
 ## Deferred work
 

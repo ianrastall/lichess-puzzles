@@ -58,21 +58,55 @@
     <Grid Background="{ThemeResource JupiterSurfaceBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <SelectorBar x:Name="Views" Margin="8,4,8,0" SelectionChanged="OnViewChanged">
+        <!-- Player rating remains visible in both puzzle and history views. -->
+            <StackPanel Grid.Row="0" Spacing="8" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,0,0,1" Padding="16,12,16,12">
+                <TextBlock Text="Player rating" Style="{StaticResource JupiterPaneHeadingTextStyle}" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <DropDownButton x:Name="PlayerButton" Content="{x:Bind Player.Name, Mode=OneWay}" Padding="8,4" MaxWidth="200"
+                                    AutomationProperties.Name="Player" ToolTipService.ToolTip="Switch or manage players">
+                        <DropDownButton.Flyout>
+                            <MenuFlyout x:Name="PlayerMenu" Opening="OnPlayerMenuOpening" Placement="TopEdgeAlignedLeft" />
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                    <TextBlock Grid.Column="1" Text="{x:Bind Player.RatingText, Mode=OneWay}" Style="{StaticResource JupiterSectionHeadingTextStyle}" VerticalAlignment="Center"
+                               ToolTipService.ToolTip="{x:Bind Player.RatingTooltip, Mode=OneWay}"
+                               AutomationProperties.Name="{x:Bind Player.RatingTooltip, Mode=OneWay}" />
+                    <TextBlock Grid.Column="2" Text="{x:Bind Player.ChangeText, Mode=OneWay}" VerticalAlignment="Center" MinWidth="32" TextAlignment="Right"
+                               AutomationProperties.Name="{x:Bind Player.ChangeName, Mode=OneWay}" />
+                </Grid>
+                <TextBlock Text="{x:Bind Player.RatingStatus, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ToggleSwitch IsOn="{x:Bind Player.Rated, Mode=TwoWay}" OnContent="Rated" OffContent="Rated" MinWidth="0"
+                                  ToolTipService.ToolTip="A first attempt at a puzzle counts toward the rating; the first mistake, hint or solution makes it a loss" />
+                    <TextBlock Grid.Column="1" Text="{x:Bind Player.TodayText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}"
+                               VerticalAlignment="Center" HorizontalAlignment="Right" />
+                </Grid>
+            </StackPanel>
+
+        <SelectorBar x:Name="Views" Grid.Row="1" Margin="8,4,8,0" SelectionChanged="OnViewChanged">
             <SelectorBarItem x:Name="PuzzleItem" Text="Puzzle" IsSelected="True" ToolTipService.ToolTip="Puzzle (Ctrl+1)" />
             <SelectorBarItem x:Name="HistoryItem" Text="History" ToolTipService.ToolTip="History (Ctrl+2)" />
         </SelectorBar>
 
         <!-- Puzzle view -->
-        <Grid x:Name="PuzzleView" Grid.Row="1" Padding="16,8,16,16" RowSpacing="12">
+        <Grid x:Name="PuzzleView" Grid.Row="2" Padding="16,8,16,16" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -141,40 +175,8 @@
                            Style="{StaticResource JupiterCaptionTextStyle}" />
             </Grid>
 
-            <!-- Player -->
-            <StackPanel Grid.Row="4" Spacing="8" BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <DropDownButton x:Name="PlayerButton" Content="{x:Bind Player.Name, Mode=OneWay}" Padding="8,4" MaxWidth="200"
-                                    AutomationProperties.Name="Player" ToolTipService.ToolTip="Switch or manage players">
-                        <DropDownButton.Flyout>
-                            <MenuFlyout x:Name="PlayerMenu" Opening="OnPlayerMenuOpening" Placement="TopEdgeAlignedLeft" />
-                        </DropDownButton.Flyout>
-                    </DropDownButton>
-                    <TextBlock Grid.Column="1" Text="{x:Bind Player.RatingText, Mode=OneWay}" Style="{StaticResource JupiterBodyStrongTextStyle}" VerticalAlignment="Center"
-                               ToolTipService.ToolTip="{x:Bind Player.RatingTooltip, Mode=OneWay}"
-                               AutomationProperties.Name="{x:Bind Player.RatingTooltip, Mode=OneWay}" />
-                    <TextBlock Grid.Column="2" Text="{x:Bind Player.ChangeText, Mode=OneWay}" VerticalAlignment="Center" MinWidth="32" TextAlignment="Right"
-                               AutomationProperties.Name="{x:Bind Player.ChangeName, Mode=OneWay}" />
-                </Grid>
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <ToggleSwitch IsOn="{x:Bind Player.Rated, Mode=TwoWay}" OnContent="Rated" OffContent="Rated" MinWidth="0"
-                                  ToolTipService.ToolTip="A first attempt at a puzzle counts toward the rating; the first mistake, hint or solution makes it a loss" />
-                    <TextBlock Grid.Column="1" Text="{x:Bind Player.TodayText, Mode=OneWay}" Style="{StaticResource JupiterCaptionTextStyle}"
-                               VerticalAlignment="Center" HorizontalAlignment="Right" />
-                </Grid>
-            </StackPanel>
-
             <!-- Evaluation -->
-            <StackPanel Grid.Row="5" Spacing="4" Visibility="{x:Bind views:PuzzlePane.Visible(Evaluation.IsVisible), Mode=OneWay}"
+            <StackPanel Grid.Row="4" Spacing="4" Visibility="{x:Bind views:PuzzlePane.Visible(Evaluation.IsVisible), Mode=OneWay}"
                         BorderBrush="{ThemeResource JupiterSeparatorBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                 <Grid>
                     <TextBlock Text="Evaluation" Style="{StaticResource JupiterPaneHeadingTextStyle}" />
@@ -188,7 +190,7 @@
         </Grid>
 
         <!-- History view -->
-        <Grid x:Name="HistoryView" Grid.Row="1" Padding="16,8,16,16" RowSpacing="8" Visibility="Collapsed">
+        <Grid x:Name="HistoryView" Grid.Row="2" Padding="16,8,16,16" RowSpacing="8" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />

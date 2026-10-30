@@ -19,7 +19,7 @@ use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -225,6 +225,9 @@ struct UpdateState {
 }
 
 struct Inner {
+    /// Serializes state snapshots and session commits, never long screening searches.
+    state_gate: Mutex<()>,
+    state_revision: AtomicU64,
     data_dir: PathBuf,
     source: Source,
     store: RwLock<Option<OpenStore>>,
@@ -259,6 +262,8 @@ impl Service {
         let players = PlayerStore::open(&config.data_dir.join("players.sqlite"), &config.default_player)
             .map_err(ServiceError::Player)?;
         let inner = Arc::new(Inner {
+            state_gate: Mutex::new(()),
+            state_revision: AtomicU64::new(0),
             source: Source::new(config.data_dir.join("source"), config.source_url),
             data_dir: config.data_dir,
             store: RwLock::new(None),
@@ -520,6 +525,12 @@ impl OperationHandle {
 }
 
 impl Inner {
+    /// Mutations invalidate in-flight selections before changing their inputs.
+    fn change_state(&self) -> MutexGuard<'_, ()> {
+        let guard = self.state_gate.lock().unwrap();
+        self.state_revision.fetch_add(1, Ordering::Relaxed);
+        guard
+    }
     fn current_store(&self) -> Option<Arc<Store>> {
         self.store.read().unwrap().as_ref().map(|o| o.store.clone())
     }
@@ -710,6 +721,7 @@ impl Inner {
     }
 
     fn switch_store(&self) -> Result<(), ServiceError> {
+        let _state = self.change_state();
         let next = self.data_dir.join(NEXT_STORE_FILE);
         if !next.is_file() {
             return Err(ServiceError::Io("no new puzzle store has been built".into()));

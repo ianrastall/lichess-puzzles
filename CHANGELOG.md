@@ -2,6 +2,8 @@
 
 ## 3.2.0 — 30 October 2026
 
+- Move the current player's rating into a labeled section at the top of the puzzle pane, visible in both Puzzle and History. Show provisional status, rating deviation and rated-puzzle count without requiring a tooltip.
+- Select using the projected rating after an unfinished attempt is abandoned, without settling that attempt when selection fails. Capture selection inputs together and recheck their revision under the same lock as session creation; changed player/filter/session/store state retries selection.
 - Add optional pre-presentation screening for forced mate in one or two, using a bounded legal-move proof search independent of theme tags. Searches run off the UI thread, with a prepared candidate and a reusable position/version cache in `screening.sqlite`.
 - Preserve the original CSV, derived puzzle store, Lichess ratings and user history. Screening settings are saved with presets; switching screening off restores the original selection. Filter counts and exports remain before screening.
 - Keep near-rating selection within an explicit ±75, ±150 or ±300 range. Empty selections explain how to adjust it, without a silent fallback to distant puzzles. New settings default to near-rating selection at ±150 and skipping played puzzles; existing saved choices are retained.

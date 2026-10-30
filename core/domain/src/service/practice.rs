@@ -16,7 +16,7 @@ use super::{EventAction, EventLevel, Inner, OperationKind, Service, ServiceError
 use crate::engine::{self, SearchInfo};
 use crate::export::{self, ExportFormat};
 use crate::filter::{self, CompiledFilter, Counts, Filter};
-use crate::players::{HistoryEntry, HistoryStats, Player, PlayerError, PuzzleResult};
+use crate::players::{HistoryEntry, HistoryStats, Player, PlayerError, PuzzleResult, glicko2};
 use crate::session::{MoveOutcome, Session, SessionError, SessionView};
 use crate::store::Store;
 
@@ -131,6 +131,7 @@ impl Service {
 
     /// Replaces the current filter and returns its counts. An invalid filter is not kept.
     pub fn set_filter(&self, filter: Filter, skip_played: bool) -> Result<Counts, ServiceError> {
+        let _state = self.inner.change_state();
         let store = self.store()?;
         let mut compiled = filter.compile(&store).map_err(ServiceError::Filter)?;
         if skip_played {
@@ -149,6 +150,7 @@ impl Service {
 
     /// Starts a puzzle by id or lichess.org training link.
     pub fn load_puzzle(&self, id_or_link: &str, replay: bool) -> Result<SessionResult, ServiceError> {
+        let _state = self.inner.change_state();
         let store = self.store()?;
         let id = puzzle_id_from(id_or_link);
         let index = store.find(&id).ok_or_else(|| ServiceError::NotFound(id.clone()))?;
@@ -183,6 +185,10 @@ impl Service {
     /// Applies a command to the current session, settling the rating and recording history.
     pub fn session(&self, command: super::SessionCommand) -> Result<SessionResult, ServiceError> {
         use super::SessionCommand as C;
+        let _state = self.inner.state_gate.lock().unwrap();
+        if !matches!(command, C::Get) {
+            self.inner.state_revision.fetch_add(1, Ordering::Relaxed);
+        }
         let mut guard = self.inner.session.lock().unwrap();
         let active = guard.as_mut().ok_or(ServiceError::Session(SessionError::State("no puzzle is open")))?;
         let session = &mut active.session;
@@ -239,6 +245,7 @@ impl Service {
 
     /// Whether new puzzles are rated.
     pub fn set_rated(&self, rated: bool) {
+        let _state = self.inner.change_state();
         self.inner.rated.store(rated, Ordering::Relaxed);
     }
 
@@ -255,6 +262,7 @@ impl Service {
     }
 
     pub fn set_current_player(&self, id: i64) -> Result<(), ServiceError> {
+        let _state = self.inner.change_state();
         let mut guard = self.inner.session.lock().unwrap();
         {
             let players = self.inner.players.lock().unwrap();
@@ -275,14 +283,17 @@ impl Service {
     }
 
     pub fn add_player(&self, name: &str) -> Result<Player, ServiceError> {
+        let _state = self.inner.change_state();
         self.inner.players.lock().unwrap().add(name).map_err(player_error)
     }
 
     pub fn rename_player(&self, id: i64, name: &str) -> Result<Player, ServiceError> {
+        let _state = self.inner.change_state();
         self.inner.players.lock().unwrap().rename(id, name).map_err(player_error)
     }
 
     pub fn delete_player(&self, id: i64) -> Result<(), ServiceError> {
+        let _state = self.inner.change_state();
         let mut guard = self.inner.session.lock().unwrap();
         self.inner.players.lock().unwrap().delete(id).map_err(player_error)?;
         if let Some(active) = guard.as_mut()
@@ -298,6 +309,7 @@ impl Service {
     }
 
     pub fn clear_history(&self, id: i64) -> Result<u64, ServiceError> {
+        let _state = self.inner.change_state();
         let removed = self.inner.players.lock().unwrap().clear_history(id).map_err(player_error)?;
         *self.inner.played.lock().unwrap() = None;
         Ok(removed)
@@ -436,6 +448,21 @@ impl Active {
 }
 
 impl Inner {
+    /// Must be called under state_gate. Forecast the loss that Next would settle, without
+    /// changing the active attempt, history or database if no eligible candidate is found.
+    pub(super) fn selection_player(&self) -> Result<(Player, Option<String>, bool), ServiceError> {
+        let session = self.session.lock().unwrap();
+        let mut player = self.players.lock().unwrap().current().map_err(player_error)?;
+        let current = session.as_ref().map(|a| a.session.puzzle().id.clone());
+        let pending = session
+            .as_ref()
+            .is_some_and(|a| a.tracker.player == player.id && a.tracker.attempted && !a.tracker.finished);
+        if let Some(active) = session.as_ref().filter(|a| pending && a.tracker.rated && !a.tracker.settled) {
+            let puzzle = active.session.puzzle();
+            player.rating = glicko2(player.rating, puzzle.rating.into(), puzzle.deviation.into(), 0.0);
+        }
+        Ok((player, current, pending))
+    }
     fn new_tracker(&self, session: &Session, replay: bool) -> Result<Tracker, ServiceError> {
         let players = self.players.lock().unwrap();
         let player = players.current().map_err(player_error)?.id;

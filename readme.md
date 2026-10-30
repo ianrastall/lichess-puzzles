@@ -33,6 +33,8 @@ Each player has a Glicko-2 puzzle rating starting at 1500 ± 350; a `?` marks it
 
 This is a local rating based on your selected puzzles, not a Lichess account rating or over-the-board rating. Short-mate detection describes a position, not its human difficulty; a short mate can still be challenging. Screening and background preparation never count as attempts.
 
+The **Player rating** section stays at the top of both Puzzle and History, with the current player, rating, provisional status, rating deviation and rated-puzzle count. If Next would abandon an attempt, matching uses the rating that its loss would produce. The loss is committed only when an eligible next puzzle is ready. Selection retries if player, filter, session or database state changes before the new session starts.
+
 **Evaluation** (off by default; **View** or **Settings**) runs a small built-in engine after the puzzle ends, or while solving if you choose. It shows a score, best line and an evaluation bar. It is a guide, not an authority.
 
 **Settings > Appearance > Theme** offers Dark, Light, and Use Windows setting. The choice applies immediately to the main window, settings and dialogs, and is saved with the accent and board settings.
